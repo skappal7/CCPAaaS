@@ -171,29 +171,4 @@ with tab1:
                 if metric == "First Call Resolution (FCR)":
                     st.write(f"Model R-squared: {best_rf_fcr_model.score(X_test_fcr, y_test_fcr):.2f}")
                 else:
-                    st.write(f"Model Accuracy: {best_rf_churn_model.score(X_test_churn, y_test_churn):.2f}")
-    else:
-        st.write("### Error Loading Models. Please check the debug information in the sidebar.")
-
-with tab2:
-    st.title("Model Evaluation with Shapash")
-    
-    if models_loaded and st.button("Generate Shapash Report"):
-        # Prepare the SmartExplainer
-        if metric == "First Call Resolution (FCR)":
-            if model_type == "Gradient Boosting":
-                explainer = SmartExplainer(model=best_gb_fcr_model)
-            else:
-                explainer = SmartExplainer(model=best_rf_fcr_model)
-        else:
-            if model_type == "Gradient Boosting":
-                explainer = SmartExplainer(model=best_gb_churn_model)
-            else:
-                explainer = SmartExplainer(model=best_rf_churn_model)
-
-        explainer.compile(X_train_fcr, y_train_fcr)
-        
-        st.write(explainer.plot.features_importance())
-        st.write(explainer.plot.contribution_plot())
-
-        st.write("### Shapash Report Generated")
+                    st.write(f"Model Accuracy: {best_rf_churn_model.score(X_test_churn, y_test_churn):.2f
