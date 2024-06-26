@@ -135,9 +135,11 @@ with tab1:
                             csat, churn_rate, awt, aht, call_transfer_rate]])
     input_data = np.hstack((input_data, industry_encoded))
 
-    # Create feature names
-    feature_names = ['Average Call Duration', 'Hold Time', 'Abandonment Rate', 'ASA', 'ACW', 
-                     'Sentiment Score', 'CSAT', 'Churn Rate', 'AWT', 'AHT', 'Call Transfer Rate'] + list(industry_columns)
+    # Create feature names (matching the original training data)
+    feature_names = [
+        'Average Call Duration (min)', 'Hold Time (sec)', 'Abandonment Rate (%)', 'ASA (sec)', 'ACW (sec)', 
+        'Sentiment Score', 'CSAT (%)', 'Churn Rate (%)', 'Average Waiting Time (AWT sec)', 
+        'Average Handle Time (AHT min)', 'Call Transfer Rate (%)'] + list(industry_columns)
 
     # Convert to DataFrame with feature names
     input_df = pd.DataFrame(input_data, columns=feature_names)
