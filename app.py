@@ -4,6 +4,8 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.ensemble import GradientBoostingRegressor
 import joblib
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Load the trained models
 fcr_model = joblib.load('fcr_model.pkl')
@@ -16,29 +18,42 @@ scaler = StandardScaler()
 # Function to preprocess the input data
 def preprocess_data(input_data):
     input_data['Industry'] = label_encoder.fit_transform(input_data['Industry'])
-    input_data_scaled = scaler.fit_transform(input_data)
+    input_data_scaled = scaler.transform(input_data)
     return input_data_scaled
 
-# App title and description
-st.title("Performance Optimizer Pro")
-st.write("Predict and optimize your First Call Resolution (FCR) and Churn rates based on your performance metrics.")
+# Function to display feature importance
+def plot_feature_importance(model, features):
+    importances = model.feature_importances_
+    feature_names = features.columns
+    feature_importances = pd.DataFrame({'Feature': feature_names, 'Importance': importances})
+    feature_importances = feature_importances.sort_values('Importance', ascending=False)
+
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x='Importance', y='Feature', data=feature_importances)
+    plt.title('Feature Importance')
+    plt.tight_layout()
+    st.pyplot(plt)
+
+# Sidebar for user inputs
+st.sidebar.title("Performance Optimizer Pro")
+st.sidebar.write("Predict and optimize your First Call Resolution (FCR) and Churn rates based on your performance metrics.")
 
 # Industry selection
 industries = ['Technology', 'Healthcare', 'Retail', 'Transportation', 'Finance']
-industry = st.selectbox("Select Industry", industries)
+industry = st.sidebar.selectbox("Select Industry", industries)
 
 # Input section
-st.subheader("Input your current performance metrics:")
-average_call_duration = st.number_input("Average Call Duration (min)")
-hold_time = st.number_input("Hold Time (sec)")
-abandonment_rate = st.number_input("Abandonment Rate (%)")
-asa = st.number_input("ASA (sec)")
-acw = st.number_input("ACW (sec)")
-sentiment_score = st.number_input("Sentiment Score")
-csat = st.number_input("CSAT (%)")
-average_waiting_time = st.number_input("Average Waiting Time (AWT sec)")
-average_handle_time = st.number_input("Average Handle Time (AHT min)")
-call_transfer_rate = st.number_input("Call Transfer Rate (%)")
+st.sidebar.subheader("Input your current performance metrics:")
+average_call_duration = st.sidebar.slider("Average Call Duration (min)", 0.0, 60.0, 5.0)
+hold_time = st.sidebar.slider("Hold Time (sec)", 0.0, 1000.0, 50.0)
+abandonment_rate = st.sidebar.slider("Abandonment Rate (%)", 0.0, 100.0, 5.0)
+asa = st.sidebar.slider("ASA (sec)", 0.0, 1000.0, 50.0)
+acw = st.sidebar.slider("ACW (sec)", 0.0, 1000.0, 50.0)
+sentiment_score = st.sidebar.slider("Sentiment Score", 0.0, 100.0, 50.0)
+csat = st.sidebar.slider("CSAT (%)", 0.0, 100.0, 50.0)
+average_waiting_time = st.sidebar.slider("Average Waiting Time (AWT sec)", 0.0, 1000.0, 50.0)
+average_handle_time = st.sidebar.slider("Average Handle Time (AHT min)", 0.0, 60.0, 5.0)
+call_transfer_rate = st.sidebar.slider("Call Transfer Rate (%)", 0.0, 100.0, 5.0)
 
 # Create a DataFrame from the input data
 input_data = pd.DataFrame({
@@ -55,8 +70,9 @@ input_data = pd.DataFrame({
     'Call Transfer Rate (%)': [call_transfer_rate]
 })
 
-# Preprocess input data
-input_data_scaled = preprocess_data(input_data)
+# Fit the label encoder and scaler to the input data (for demo purposes)
+input_data['Industry'] = label_encoder.fit_transform(input_data['Industry'])
+input_data_scaled = scaler.fit_transform(input_data)
 
 # Prediction and optimization
 st.subheader("Select the performance indicator to optimize:")
@@ -65,14 +81,18 @@ option = st.selectbox("", ["First Call Resolution (FCR)", "Churn"])
 if option == "First Call Resolution (FCR)":
     prediction = fcr_model.predict(input_data_scaled)
     st.write(f"Predicted FCR: {prediction[0]:.2f}%")
+    plot_feature_importance(fcr_model, input_data)
+
 elif option == "Churn":
     prediction = churn_model.predict(input_data_scaled)
     st.write(f"Predicted Churn Rate: {prediction[0]:.2f}%")
+    plot_feature_importance(churn_model, input_data)
 
 # Documentation
 st.subheader("Documentation:")
 st.write("""
 - **Industry selection**: Choose the industry your data belongs to.
-- **Input section**: Enter your current performance metrics.
+- **Input section**: Enter your current performance metrics using the sliders.
 - **Prediction and optimization**: Select the performance indicator you want to optimize and get the prediction.
+- **Feature Importance**: View the chart to see which variables impact FCR or Churn the most.
 """)
