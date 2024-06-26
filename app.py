@@ -203,4 +203,5 @@ if st.checkbox("Show Debug Information"):
 # Model information
 if st.checkbox("Show Model Information"):
     st.write("### Model Information")
-    for name, model in {'GB Churn': best_gb_churn_model, 'GB FCR': best_gb_fcr_model
+    for name, model in {'GB Churn': best_gb_churn_model, 'GB FCR': best_gb_fcr_model, 
+                        'RF Churn': best_rf_churn_model, 'RF FCR': best_rf_fcr_model}.items
