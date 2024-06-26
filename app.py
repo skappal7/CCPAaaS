@@ -117,17 +117,24 @@ with tab1:
     aht = st.sidebar.number_input("Average Handle Time (AHT min)", min_value=0.0, value=10.0)
     call_transfer_rate = st.sidebar.number_input("Call Transfer Rate (%)", min_value=0.0, value=10.0)
     
-    # Industry selection
-    industry = st.sidebar.selectbox("Select Industry", 
-                                    ["Telecommunications", "Healthcare", "Financial Services", "Retail", 
-                                     "Technology", "Travel and Hospitality", "Utilities", "E-commerce"])
-
+    # Industry selection (updated to match the model's expected categories)
+    industry_mapping = {
+        "Telecommunications": "Telecommunications",
+        "Healthcare": "Healthcare",
+        "Financial Services": "Finance",
+        "Retail": "Retail",
+        "Technology": "Technology",
+        "Transportation": "Transportation",
+        "Utilities": "Utilities",
+        "Other": "Other"
+    }
+    industry = st.sidebar.selectbox("Select Industry", list(industry_mapping.keys()))
+    
     # Create one-hot encoded industry feature
     encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
-    all_industries = ["Telecommunications", "Healthcare", "Financial Services", "Retail", 
-                      "Technology", "Travel and Hospitality", "Utilities", "E-commerce"]
+    all_industries = list(industry_mapping.values())
     encoder.fit([[ind] for ind in all_industries])
-    industry_encoded = encoder.transform([[industry]])
+    industry_encoded = encoder.transform([[industry_mapping[industry]]])
     industry_columns = encoder.get_feature_names_out(['Industry'])
     
     # Prepare input data
