@@ -2,10 +2,8 @@ import streamlit as st
 import pandas as pd
 import joblib
 import numpy as np
-import os
-import sys
-import traceback
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.preprocessing import OneHotEncoder
 
 # Set page config
 st.set_page_config(
@@ -62,57 +60,20 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-import streamlit as st
-import sys
-
-st.sidebar.write("### Debug Information")
-st.sidebar.write(f"Python version: {sys.version}")
-
-try:
-    import pandas as pd
-    st.sidebar.write(f"Pandas version: {pd.__version__}")
-except ImportError:
-    st.sidebar.write("Pandas not installed")
-
-try:
-    import numpy as np
-    st.sidebar.write(f"Numpy version: {np.__version__}")
-except ImportError:
-    st.sidebar.write("Numpy not installed")
-
-try:
-    import sklearn
-    st.sidebar.write(f"Scikit-learn version: {sklearn.__version__}")
-except ImportError:
-    st.sidebar.write("Scikit-learn not installed")
-
-try:
-    import joblib
-    st.sidebar.write(f"Joblib version: {joblib.__version__}")
-except ImportError:
-    st.sidebar.write("Joblib not installed")
-
 # Function to safely load models
+@st.cache_resource
 def load_model(filename):
     try:
-        model_path = os.path.join(os.path.dirname(__file__), filename)
-        if os.path.exists(model_path):
-            return joblib.load(model_path)
-        else:
-            st.warning(f"Model file not found: {filename}")
-            return None
+        return joblib.load(filename)
     except Exception as e:
         st.error(f"Error loading model {filename}: {str(e)}")
-        st.text(traceback.format_exc())
         return None
 
 # Load the models
-models = {
-    'best_gb_churn_model': load_model('best_gb_churn_model.pkl'),
-    'best_gb_fcr_model': load_model('best_gb_fcr_model.pkl'),
-    'best_rf_churn_model': load_model('best_rf_churn_model.pkl'),
-    'best_rf_fcr_model': load_model('best_rf_fcr_model.pkl')
-}
+best_gb_churn_model = load_model('best_gb_churn_model.pkl')
+best_gb_fcr_model = load_model('best_gb_fcr_model.pkl')
+best_rf_churn_model = load_model('best_rf_churn_model.pkl')
+best_rf_fcr_model = load_model('best_rf_fcr_model.pkl')
 
 # Function to make predictions
 def make_predictions(model, input_data):
@@ -147,16 +108,36 @@ with tab1:
     awt = st.sidebar.number_input("Average Waiting Time (AWT sec)", min_value=0.0, value=40.0)
     aht = st.sidebar.number_input("Average Handle Time (AHT min)", min_value=0.0, value=10.0)
     call_transfer_rate = st.sidebar.number_input("Call Transfer Rate (%)", min_value=0.0, value=10.0)
+    
+    # Industry selection
+    industry = st.sidebar.selectbox("Select Industry", 
+                                    ["Telecommunications", "Healthcare", "Financial Services", "Retail", 
+                                     "Technology", "Travel and Hospitality", "Utilities", "E-commerce"])
 
+    # Create one-hot encoded industry feature
+    encoder = OneHotEncoder(sparse=False, handle_unknown='ignore')
+    industry_encoded = encoder.fit_transform([[industry]])
+    industry_columns = encoder.get_feature_names_out(['Industry'])
+    
     # Prepare input data
-    input_data = np.array([[call_duration, hold_time, abandonment_rate, asa, acw, sentiment_score, csat, churn_rate, awt, aht, call_transfer_rate]])
+    input_data = np.array([[call_duration, hold_time, abandonment_rate, asa, acw, sentiment_score, 
+                            csat, churn_rate, awt, aht, call_transfer_rate]])
+    input_data = np.hstack((input_data, industry_encoded))
 
-    # Select the appropriate model
-    model_key = f"best_{'gb' if model_type == 'Gradient Boosting' else 'rf'}_{('fcr' if metric == 'First Call Resolution (FCR)' else 'churn')}_model"
-    model = models[model_key]
+    if metric == "First Call Resolution (FCR)":
+        if model_type == "Gradient Boosting":
+            model = best_gb_fcr_model
+        else:
+            model = best_rf_fcr_model
+        st.write("### Predictions for First Call Resolution (FCR)")
+    else:
+        if model_type == "Gradient Boosting":
+            model = best_gb_churn_model
+        else:
+            model = best_rf_churn_model
+        st.write("### Predictions for Churn Rate")
 
     if model is not None:
-        st.write(f"### Predictions for {metric}")
         prediction = make_predictions(model, input_data)
         if prediction is not None:
             st.write(f"Predicted {metric}: {prediction[0]:.2f}")
@@ -164,8 +145,9 @@ with tab1:
         # Feature importance
         if st.checkbox("Show Feature Importance"):
             if hasattr(model, 'feature_importances_'):
+                feature_names = ['Average Call Duration', 'Hold Time', 'Abandonment Rate', 'ASA', 'ACW', 
+                                 'Sentiment Score', 'CSAT', 'Churn Rate', 'AWT', 'AHT', 'Call Transfer Rate'] + list(industry_columns)
                 importances = model.feature_importances_
-                feature_names = ['Average Call Duration', 'Hold Time', 'Abandonment Rate', 'ASA', 'ACW', 'Sentiment Score', 'CSAT', 'Churn Rate', 'AWT', 'AHT', 'Call Transfer Rate']
                 feature_importance = pd.DataFrame({'Feature': feature_names, 'Importance': importances})
                 feature_importance = feature_importance.sort_values(by='Importance', ascending=False)
                 st.write("### Feature Importance")
@@ -173,17 +155,25 @@ with tab1:
             else:
                 st.write("Feature importance not available for this model.")
 
-        # Model accuracy
-        if st.checkbox("Show Model Accuracy"):
-            st.write("Model accuracy information not available. Please retrain the model with a test set to get accuracy metrics.")
-
 with tab2:
-    st.title("Model Evaluation with Shapash")
-    st.write("Shapash integration is not implemented in this version of the app.")
+    st.title("Model Evaluation")
+    st.write("This section would typically contain model evaluation metrics and visualizations.")
+    st.write("For a complete implementation, you would need to have access to the test data and performance metrics.")
 
-# Add this at the end of your script
-if st.button("Print Model Information"):
-    for name, model in models.items():
+# Debug information
+if st.checkbox("Show Debug Information"):
+    st.write("### Debug Information")
+    st.write(f"Python version: {sys.version}")
+    st.write(f"Pandas version: {pd.__version__}")
+    st.write(f"Numpy version: {np.__version__}")
+    st.write(f"Scikit-learn version: {sklearn.__version__}")
+    st.write(f"Joblib version: {joblib.__version__}")
+
+# Model information
+if st.checkbox("Show Model Information"):
+    st.write("### Model Information")
+    for name, model in {'GB Churn': best_gb_churn_model, 'GB FCR': best_gb_fcr_model, 
+                        'RF Churn': best_rf_churn_model, 'RF FCR': best_rf_fcr_model}.items():
         if model is not None:
             st.write(f"{name}: {type(model).__name__}")
         else:
