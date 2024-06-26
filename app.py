@@ -37,8 +37,8 @@ if uploaded_file is not None:
 
     # Function to calculate z-scores
     def calculate_z_scores(input_data, industry):
-        industry_mean = industry_stats[industry_stats['Industry'] == industry].xs('mean', level=1, axis=1)
-        industry_std = industry_stats[industry_stats['Industry'] == industry].xs('std', level=1, axis=1)
+        industry_mean = industry_stats[industry_stats['Industry'] == industry].xs('mean', level=1, axis=1)[input_data.columns]
+        industry_std = industry_stats[industry_stats['Industry'] == industry].xs('std', level=1, axis=1)[input_data.columns]
         z_scores = (input_data - industry_mean) / industry_std
         return z_scores
 
