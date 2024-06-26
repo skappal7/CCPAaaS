@@ -62,13 +62,35 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Debug information
+import streamlit as st
+import sys
+
 st.sidebar.write("### Debug Information")
 st.sidebar.write(f"Python version: {sys.version}")
-st.sidebar.write(f"Pandas version: {pd.__version__}")
-st.sidebar.write(f"Numpy version: {np.__version__}")
-st.sidebar.write(f"Scikit-learn version: {sklearn.__version__}")
-st.sidebar.write(f"Joblib version: {joblib.__version__}")
+
+try:
+    import pandas as pd
+    st.sidebar.write(f"Pandas version: {pd.__version__}")
+except ImportError:
+    st.sidebar.write("Pandas not installed")
+
+try:
+    import numpy as np
+    st.sidebar.write(f"Numpy version: {np.__version__}")
+except ImportError:
+    st.sidebar.write("Numpy not installed")
+
+try:
+    import sklearn
+    st.sidebar.write(f"Scikit-learn version: {sklearn.__version__}")
+except ImportError:
+    st.sidebar.write("Scikit-learn not installed")
+
+try:
+    import joblib
+    st.sidebar.write(f"Joblib version: {joblib.__version__}")
+except ImportError:
+    st.sidebar.write("Joblib not installed")
 
 # Function to safely load models
 def load_model(filename):
