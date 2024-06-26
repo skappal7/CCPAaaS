@@ -2,19 +2,21 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler, LabelEncoder
-import joblib
+import pickle
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 
-# Function to safely load models and preprocessing objects
+# Function to safely load models and preprocessing objects using pickle
 def safe_load(filename):
     try:
-        return joblib.load(filename)
+        with open(filename, 'rb') as f:
+            return pickle.load(f)
     except FileNotFoundError:
         st.error(f"Error: File '{filename}' not found. Please make sure it exists in the app directory.")
     except Exception as e:
         st.error(f"Error loading '{filename}': {str(e)}")
+        st.error(f"Error type: {type(e).__name__}")
     return None
 
 # Check if model files exist
