@@ -109,15 +109,18 @@ with tab1:
     aht = st.sidebar.number_input("Average Handle Time (AHT min)", min_value=0.0, value=10.0)
     call_transfer_rate = st.sidebar.number_input("Call Transfer Rate (%)", min_value=0.0, value=10.0)
     
+from sklearn.preprocessing import OneHotEncoder
+
     # Industry selection
     industry = st.sidebar.selectbox("Select Industry", 
-                                    ["Telecommunications", "Healthcare", "Financial Services", "Retail", 
-                                     "Technology", "Travel and Hospitality", "Utilities", "E-commerce"])
+                                ["Telecommunications", "Healthcare", "Financial Services", "Retail", 
+                                 "Technology", "Travel and Hospitality", "Utilities", "E-commerce"])
 
     # Create one-hot encoded industry feature
-    encoder = OneHotEncoder(sparse=False, handle_unknown='ignore')
+    encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
     industry_encoded = encoder.fit_transform([[industry]])
     industry_columns = encoder.get_feature_names_out(['Industry'])
+
     
     # Prepare input data
     input_data = np.array([[call_duration, hold_time, abandonment_rate, asa, acw, sentiment_score, 
