@@ -124,9 +124,7 @@ with tab1:
         "Financial Services": "Finance",
         "Retail": "Retail",
         "Technology": "Technology",
-        "Transportation": "Transportation",
-        "Utilities": "Utilities",
-        "Other": "Other"
+        "Transportation": "Transportation"
     }
     industry = st.sidebar.selectbox("Select Industry", list(industry_mapping.keys()))
     
@@ -167,6 +165,11 @@ with tab1:
         else:
             model = best_rf_churn_model
         st.write("### Predictions for Churn Rate")
+
+    # Debug: Print model's expected feature names
+    if hasattr(model, 'feature_names_in_'):
+        st.write("Model's expected feature names:")
+        st.write(model.feature_names_in_)
 
     prediction = make_predictions(model, input_df)
     if prediction is not None:
