@@ -35,13 +35,6 @@ if uploaded_file is not None:
     # Preprocess data to calculate industry averages and standard deviations
     industry_stats = data.groupby('Industry').agg(['mean', 'std']).reset_index()
 
-    # Function to calculate z-scores
-    def calculate_z_scores(input_data, industry):
-        industry_mean = industry_stats[industry_stats['Industry'] == industry].xs('mean', level=1, axis=1)[input_data.columns]
-        industry_std = industry_stats[industry_stats['Industry'] == industry].xs('std', level=1, axis=1)[input_data.columns]
-        z_scores = (input_data - industry_mean) / industry_std
-        return z_scores
-
     # Sidebar for user inputs
     st.sidebar.title("Input Metrics")
     st.sidebar.write("Enter your current performance metrics.")
@@ -75,6 +68,20 @@ if uploaded_file is not None:
         'Average Handle Time (AHT min)': [average_handle_time],
         'Call Transfer Rate (%)': [call_transfer_rate]
     })
+
+    # Function to calculate z-scores
+    def calculate_z_scores(input_data, industry):
+        # Select the relevant industry statistics
+        industry_mean = industry_stats[industry_stats['Industry'] == industry].xs('mean', level=1, axis=1)
+        industry_std = industry_stats[industry_stats['Industry'] == industry].xs('std', level=1, axis=1)
+        
+        # Align columns
+        industry_mean = industry_mean[input_data.columns]
+        industry_std = industry_std[input_data.columns]
+        
+        # Calculate z-scores
+        z_scores = (input_data - industry_mean) / industry_std
+        return z_scores
 
     # Calculate z-scores
     z_scores = calculate_z_scores(input_data, industry).squeeze()
