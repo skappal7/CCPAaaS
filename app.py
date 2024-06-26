@@ -1,185 +1,130 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-import pickle
 import matplotlib.pyplot as plt
 import seaborn as sns
-import os
 
-# Function to safely load models and preprocessing objects using pickle
-def safe_load(filename):
-    try:
-        with open(filename, 'rb') as f:
-            return pickle.load(f)
-    except FileNotFoundError:
-        st.error(f"Error: File '{filename}' not found. Please make sure it exists in the app directory.")
-    except Exception as e:
-        st.error(f"Error loading '{filename}': {str(e)}")
-        st.error(f"Error type: {type(e).__name__}")
-    return None
+# Set page configuration and theme
+st.set_page_config(page_title="Performance Optimizer Pro", layout="wide")
+st.markdown("""
+    <style>
+    .main {
+        background-color: #ffffff;
+        color: #000000;
+        font-family: 'Poppins', sans-serif;
+    }
+    .sidebar .sidebar-content {
+        background-color: #07B1FC;
+        color: #ffffff;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-# Check if model files exist
-model_files = ['fcr_model.pkl', 'churn_model.pkl', 'scaler.pkl', 'label_encoder.pkl']
-missing_files = [file for file in model_files if not os.path.exists(file)]
+# Title and description
+st.title("Performance Optimizer Pro")
+st.write("Predict and optimize your First Call Resolution (FCR) and Churn rates based on your performance metrics.")
 
-if missing_files:
-    st.error(f"The following required files are missing: {', '.join(missing_files)}")
-    st.error("Please ensure all model files are in the same directory as the app.")
-    st.stop()
+# File uploader for data
+uploaded_file = st.file_uploader("Upload your CSV or Excel file", type=['csv', 'xlsx'])
+if uploaded_file is not None:
+    if uploaded_file.name.endswith('.csv'):
+        data = pd.read_csv(uploaded_file)
+    else:
+        data = pd.read_excel(uploaded_file)
 
-# Load the trained models and preprocessing objects
-fcr_model = safe_load('fcr_model.pkl')
-churn_model = safe_load('churn_model.pkl')
-scaler = safe_load('scaler.pkl')
-label_encoder = safe_load('label_encoder.pkl')
+    # Preprocess data to calculate industry averages and standard deviations
+    industry_stats = data.groupby('Industry').agg(['mean', 'std']).reset_index()
 
-if None in [fcr_model, churn_model, scaler, label_encoder]:
-    st.error("Failed to load one or more required files. Please check the errors above.")
-    st.stop()
+    # Save the industry statistics for use in the app
+    # industry_stats.to_csv('industry_stats.csv', index=False)
 
-# Function to preprocess the input data
-def preprocess_data(input_data):
-    try:
-        input_data['Industry'] = label_encoder.transform([input_data['Industry'].iloc[0]])
-        input_data_scaled = scaler.transform(input_data)
-        return input_data_scaled
-    except Exception as e:
-        st.error(f"Error preprocessing data: {str(e)}")
-        return None
+    # Function to calculate z-scores
+    def calculate_z_scores(input_data, industry):
+        industry_mean = industry_stats[industry_stats['Industry'] == industry].xs('mean', level=1, axis=1)
+        industry_std = industry_stats[industry_stats['Industry'] == industry].xs('std', level=1, axis=1)
+        z_scores = (input_data - industry_mean) / industry_std
+        return z_scores
 
-# Function to display feature importance
-def plot_feature_importance(model, features):
-    importances = model.feature_importances_
-    feature_names = features.columns
-    feature_importances = pd.DataFrame({'Feature': feature_names, 'Importance': importances})
-    feature_importances = feature_importances.sort_values('Importance', ascending=False)
+    # Sidebar for user inputs
+    st.sidebar.title("Input Metrics")
+    st.sidebar.write("Enter your current performance metrics.")
+
+    # Industry selection
+    industries = industry_stats['Industry'].unique()
+    industry = st.sidebar.selectbox("Select Industry", industries)
+
+    # Input section
+    average_call_duration = st.sidebar.slider("Average Call Duration (min)", 0.0, 60.0, 5.0)
+    hold_time = st.sidebar.slider("Hold Time (sec)", 0.0, 1000.0, 50.0)
+    abandonment_rate = st.sidebar.slider("Abandonment Rate (%)", 0.0, 100.0, 5.0)
+    asa = st.sidebar.slider("ASA (sec)", 0.0, 1000.0, 50.0)
+    acw = st.sidebar.slider("ACW (sec)", 0.0, 1000.0, 50.0)
+    sentiment_score = st.sidebar.slider("Sentiment Score", 0.0, 100.0, 50.0)
+    csat = st.sidebar.slider("CSAT (%)", 0.0, 100.0, 50.0)
+    average_waiting_time = st.sidebar.slider("Average Waiting Time (AWT sec)", 0.0, 1000.0, 50.0)
+    average_handle_time = st.sidebar.slider("Average Handle Time (AHT min)", 0.0, 60.0, 5.0)
+    call_transfer_rate = st.sidebar.slider("Call Transfer Rate (%)", 0.0, 100.0, 5.0)
+
+    # Create a DataFrame from the input data
+    input_data = pd.DataFrame({
+        'Average Call Duration (min)': [average_call_duration],
+        'Hold Time (sec)': [hold_time],
+        'Abandonment Rate (%)': [abandonment_rate],
+        'ASA (sec)': [asa],
+        'ACW (sec)': [acw],
+        'Sentiment Score': [sentiment_score],
+        'CSAT (%)': [csat],
+        'Average Waiting Time (AWT sec)': [average_waiting_time],
+        'Average Handle Time (AHT min)': [average_handle_time],
+        'Call Transfer Rate (%)': [call_transfer_rate]
+    })
+
+    # Calculate z-scores
+    z_scores = calculate_z_scores(input_data, industry)
+
+    # Weighted sum for predictions (weights can be adjusted based on domain expertise)
+    weights = {
+        'Average Call Duration (min)': 0.2,
+        'Hold Time (sec)': 0.1,
+        'Abandonment Rate (%)': 0.15,
+        'ASA (sec)': 0.1,
+        'ACW (sec)': 0.05,
+        'Sentiment Score': 0.1,
+        'CSAT (%)': 0.1,
+        'Average Waiting Time (AWT sec)': 0.05,
+        'Average Handle Time (AHT min)': 0.05,
+        'Call Transfer Rate (%)': 0.1
+    }
+    predicted_fcr = np.sum(z_scores * list(weights.values()))
+    predicted_churn = np.sum(z_scores * list(weights.values()))
+
+    # Display predictions
+    st.subheader("Predicted First Call Resolution (FCR) and Churn Rates")
+    st.write(f"Predicted FCR: {predicted_fcr:.2f}%")
+    st.write(f"Predicted Churn Rate: {predicted_churn:.2f}%")
+
+    # Visualization of impact
+    st.subheader("Impact of Metrics on Predictions")
+    impact_data = pd.DataFrame({
+        'Metric': input_data.columns,
+        'Impact on FCR': z_scores.values[0] * list(weights.values()),
+        'Impact on Churn': z_scores.values[0] * list(weights.values())
+    })
+    impact_data = impact_data.melt(id_vars='Metric', var_name='Prediction', value_name='Impact')
 
     plt.figure(figsize=(10, 6))
-    sns.barplot(x='Importance', y='Feature', data=feature_importances)
-    plt.title('Feature Importance')
-    plt.tight_layout()
+    sns.barplot(x='Impact', y='Metric', hue='Prediction', data=impact_data)
+    plt.title('Impact of Metrics on FCR and Churn Predictions')
     st.pyplot(plt)
 
-# Sidebar for user inputs
-st.sidebar.title("Performance Optimizer Pro")
-st.sidebar.write("Predict and optimize your First Call Resolution (FCR) and Churn rates based on your performance metrics.")
+    # Documentation
+    st.subheader("Documentation:")
+    st.write("""
+    - **Industry selection**: Choose the industry your data belongs to.
+    - **Input section**: Enter your current performance metrics using the sliders.
+    - **Prediction and optimization**: The app uses statistical methods to predict FCR and Churn rates.
+    - **Impact Visualization**: See which metrics have the most impact on the predictions.
+    """)
+else:
+    st.write("Please upload a CSV or Excel file to start the simulation.")
 
-# Industry selection
-industries = ['Technology', 'Healthcare', 'Retail', 'Transportation', 'Finance']
-industry = st.sidebar.selectbox("Select Industry", industries)
-
-# Input section
-st.sidebar.subheader("Input your current performance metrics:")
-average_call_duration = st.sidebar.slider("Average Call Duration (min)", 0.0, 60.0, 5.0)
-hold_time = st.sidebar.slider("Hold Time (sec)", 0.0, 1000.0, 50.0)
-abandonment_rate = st.sidebar.slider("Abandonment Rate (%)", 0.0, 100.0, 5.0)
-asa = st.sidebar.slider("ASA (sec)", 0.0, 1000.0, 50.0)
-acw = st.sidebar.slider("ACW (sec)", 0.0, 1000.0, 50.0)
-sentiment_score = st.sidebar.slider("Sentiment Score", 0.0, 100.0, 50.0)
-csat = st.sidebar.slider("CSAT (%)", 0.0, 100.0, 50.0)
-average_waiting_time = st.sidebar.slider("Average Waiting Time (AWT sec)", 0.0, 1000.0, 50.0)
-average_handle_time = st.sidebar.slider("Average Handle Time (AHT min)", 0.0, 60.0, 5.0)
-call_transfer_rate = st.sidebar.slider("Call Transfer Rate (%)", 0.0, 100.0, 5.0)
-
-# Create a DataFrame from the input data
-input_data = pd.DataFrame({
-    'Industry': [industry],
-    'Average Call Duration (min)': [average_call_duration],
-    'Hold Time (sec)': [hold_time],
-    'Abandonment Rate (%)': [abandonment_rate],
-    'ASA (sec)': [asa],
-    'ACW (sec)': [acw],
-    'Sentiment Score': [sentiment_score],
-    'CSAT (%)': [csat],
-    'Average Waiting Time (AWT sec)': [average_waiting_time],
-    'Average Handle Time (AHT min)': [average_handle_time],
-    'Call Transfer Rate (%)': [call_transfer_rate]
-})
-
-# Preprocess input data
-input_data_scaled = preprocess_data(input_data)
-if input_data_scaled is None:
-    st.stop()
-
-# Prediction and optimization
-st.subheader("Select the performance indicator to optimize:")
-option = st.selectbox("", ["First Call Resolution (FCR)", "Churn"])
-
-try:
-    if option == "First Call Resolution (FCR)":
-        prediction = fcr_model.predict(input_data_scaled)
-        st.write(f"Predicted FCR: {prediction[0]:.2f}%")
-        plot_feature_importance(fcr_model, input_data)
-        current_model = fcr_model
-
-    elif option == "Churn":
-        prediction = churn_model.predict(input_data_scaled)
-        st.write(f"Predicted Churn Rate: {prediction[0]:.2f}%")
-        plot_feature_importance(churn_model, input_data)
-        current_model = churn_model
-
-except Exception as e:
-    st.error(f"Error making prediction: {str(e)}")
-    st.stop()
-
-# Optimization suggestions
-st.subheader("Optimization Suggestions")
-st.write("Based on the feature importance, here are some suggestions to improve your performance:")
-
-# Get the top 3 most important features
-feature_importances = pd.DataFrame({'Feature': input_data.columns, 'Importance': current_model.feature_importances_})
-top_features = feature_importances.nlargest(3, 'Importance')
-
-for _, feature in top_features.iterrows():
-    st.write(f"- Focus on improving {feature['Feature']}")
-    
-    # Add specific suggestions based on the feature
-    if feature['Feature'] == 'Average Call Duration (min)':
-        st.write("  - Implement better call routing to reduce unnecessary transfers")
-        st.write("  - Provide additional training to agents to handle calls more efficiently")
-    elif feature['Feature'] == 'Hold Time (sec)':
-        st.write("  - Improve your knowledge base to reduce the need for putting customers on hold")
-        st.write("  - Implement a callback feature for complex issues")
-    elif feature['Feature'] == 'Sentiment Score':
-        st.write("  - Enhance agent training on empathy and customer handling")
-        st.write("  - Implement real-time sentiment analysis to alert supervisors for intervention")
-    # Add more specific suggestions for other features as needed
-
-# Model comparison section
-st.subheader("Model Comparison")
-st.write("Compare the performance of different models:")
-
-# Implement multiple models (e.g., Random Forest, Gradient Boosting, etc.)
-models = {
-    "Random Forest": current_model,  # Using the current model (either FCR or Churn)
-    "Gradient Boosting": None,  # Add your Gradient Boosting model here
-    "XGBoost": None,  # Add your XGBoost model here
-}
-
-selected_models = st.multiselect("Select models to compare", list(models.keys()))
-
-if selected_models:
-    for model_name in selected_models:
-        model = models[model_name]
-        if model is not None:
-            prediction = model.predict(input_data_scaled)
-            st.write(f"{model_name} prediction: {prediction[0]:.2f}%")
-        else:
-            st.write(f"{model_name} is not implemented yet.")
-
-# Documentation
-st.subheader("Documentation:")
-st.write("""
-- **Industry selection**: Choose the industry your data belongs to.
-- **Input section**: Enter your current performance metrics using the sliders.
-- **Prediction and optimization**: Select the performance indicator you want to optimize and get the prediction.
-- **Feature Importance**: View the chart to see which variables impact FCR or Churn the most.
-- **Optimization Suggestions**: Get specific suggestions on how to improve your top influencing factors.
-- **Model Comparison**: Compare predictions from different machine learning models.
-""")
-
-# Display current working directory and files for debugging
-st.subheader("Debug Information:")
-st.write(f"Current working directory: {os.getcwd()}")
-st.write(f"Files in the current directory: {os.listdir('.')}")
