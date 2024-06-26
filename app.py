@@ -3,6 +3,10 @@ import pandas as pd
 import joblib
 import numpy as np
 from shapash.explainer.smart_explainer import SmartExplainer
+import sklearn
+import numpy
+import xgboost
+import shapash
 
 # Set page config
 st.set_page_config(
@@ -59,11 +63,27 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Load the models
-best_gb_churn_model = joblib.load('best_gb_churn_model.pkl')
-best_gb_fcr_model = joblib.load('best_gb_fcr_model.pkl')
-best_rf_churn_model = joblib.load('best_rf_churn_model.pkl')
-best_rf_fcr_model = joblib.load('best_rf_fcr_model.pkl')
+# Debug information
+def display_debug_info():
+    st.sidebar.title("Debug Information")
+    st.sidebar.write("### Library Versions")
+    st.sidebar.write(f"Streamlit: {st.__version__}")
+    st.sidebar.write(f"Scikit-learn: {sklearn.__version__}")
+    st.sidebar.write(f"Numpy: {numpy.__version__}")
+    st.sidebar.write(f"XGBoost: {xgboost.__version__}")
+    st.sidebar.write(f"Shapash: {shapash.__version__}")
+    
+    try:
+        best_gb_churn_model = joblib.load('best_gb_churn_model.pkl')
+        best_gb_fcr_model = joblib.load('best_gb_fcr_model.pkl')
+        best_rf_churn_model = joblib.load('best_rf_churn_model.pkl')
+        best_rf_fcr_model = joblib.load('best_rf_fcr_model.pkl')
+        st.sidebar.write("### Models Loaded Successfully")
+    except Exception as e:
+        st.sidebar.write("### Error Loading Models")
+        st.sidebar.write(str(e))
+
+display_debug_info()
 
 # Function to make predictions
 def make_predictions(model, input_data):
