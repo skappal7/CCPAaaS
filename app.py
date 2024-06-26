@@ -20,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Custom CSS
+# Custom CSS for the theme
 st.markdown(
     """
     <style>
@@ -32,6 +32,18 @@ st.markdown(
         background: #0052cc;
         color: white;
     }
+    .sidebar .sidebar-content .sidebar-collapse-control .icon {
+        color: white;
+    }
+    .sidebar .sidebar-content .sidebar-collapse-control .text {
+        color: white;
+    }
+    .sidebar .sidebar-content .sidebar-collapse-control:hover .icon {
+        color: #333333;
+    }
+    .sidebar .sidebar-content .sidebar-collapse-control:hover .text {
+        color: #333333;
+    }
     .stButton>button {
         color: #0052cc;
         background: white;
@@ -42,6 +54,13 @@ st.markdown(
     .stButton>button:hover {
         color: white;
         background: #0052cc;
+    }
+    .stTabs>div [data-baseweb="tab"] {
+        font-weight: bold;
+        color: #0052cc;
+    }
+    .stTabs>div [data-baseweb="tab"]:hover {
+        color: #002d80;
     }
     </style>
     """,
@@ -105,13 +124,27 @@ with tab1:
 
     # Create one-hot encoded industry feature
     encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
-    industry_encoded = encoder.fit_transform([[industry]])
+    all_industries = ["Telecommunications", "Healthcare", "Financial Services", "Retail", 
+                      "Technology", "Travel and Hospitality", "Utilities", "E-commerce"]
+    encoder.fit([[ind] for ind in all_industries])
+    industry_encoded = encoder.transform([[industry]])
     industry_columns = encoder.get_feature_names_out(['Industry'])
     
     # Prepare input data
     input_data = np.array([[call_duration, hold_time, abandonment_rate, asa, acw, sentiment_score, 
                             csat, churn_rate, awt, aht, call_transfer_rate]])
     input_data = np.hstack((input_data, industry_encoded))
+
+    # Create feature names
+    feature_names = ['Average Call Duration', 'Hold Time', 'Abandonment Rate', 'ASA', 'ACW', 
+                     'Sentiment Score', 'CSAT', 'Churn Rate', 'AWT', 'AHT', 'Call Transfer Rate'] + list(industry_columns)
+
+    # Convert to DataFrame with feature names
+    input_df = pd.DataFrame(input_data, columns=feature_names)
+
+    # Debug: Print input data shape and columns
+    st.write(f"Input data shape: {input_df.shape}")
+    st.write(f"Input data columns: {input_df.columns}")
 
     if metric == "First Call Resolution (FCR)":
         if model_type == "Gradient Boosting":
@@ -126,15 +159,13 @@ with tab1:
             model = best_rf_churn_model
         st.write("### Predictions for Churn Rate")
 
-    prediction = make_predictions(model, input_data)
+    prediction = make_predictions(model, input_df)
     if prediction is not None:
         st.write(f"Predicted {metric}: {prediction[0]:.2f}")
 
     # Feature importance
     if st.checkbox("Show Feature Importance"):
         if hasattr(model, 'feature_importances_'):
-            feature_names = ['Average Call Duration', 'Hold Time', 'Abandonment Rate', 'ASA', 'ACW', 
-                             'Sentiment Score', 'CSAT', 'Churn Rate', 'AWT', 'AHT', 'Call Transfer Rate'] + list(industry_columns)
             importances = model.feature_importances_
             feature_importance = pd.DataFrame({'Feature': feature_names, 'Importance': importances})
             feature_importance = feature_importance.sort_values(by='Importance', ascending=False)
