@@ -87,4 +87,8 @@ elif option == "Churn":
 # Documentation
 st.subheader("Documentation:")
 st.write("""
-- **Industry selection**: Choose the industry your &#8203;:citation[oaicite:0]{index=0}&#8203;
+- **Industry selection**: Choose the industry your data belongs to.
+- **Input section**: Enter your current performance metrics using the sliders.
+- **Prediction and optimization**: Select the performance indicator you want to optimize and get the prediction.
+- **Feature Importance**: View the chart to see which variables impact FCR or Churn the most.
+""")
