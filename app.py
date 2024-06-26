@@ -2,7 +2,10 @@ import streamlit as st
 import pandas as pd
 import joblib
 import numpy as np
-from shapash.explainer.smart_explainer import SmartExplainer
+import os
+import sys
+import traceback
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 
 # Set page config
 st.set_page_config(
@@ -59,15 +62,45 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Debug information
+st.sidebar.write("### Debug Information")
+st.sidebar.write(f"Python version: {sys.version}")
+st.sidebar.write(f"Pandas version: {pd.__version__}")
+st.sidebar.write(f"Numpy version: {np.__version__}")
+st.sidebar.write(f"Scikit-learn version: {sklearn.__version__}")
+st.sidebar.write(f"Joblib version: {joblib.__version__}")
+
+# Function to safely load models
+def load_model(filename):
+    try:
+        model_path = os.path.join(os.path.dirname(__file__), filename)
+        if os.path.exists(model_path):
+            return joblib.load(model_path)
+        else:
+            st.warning(f"Model file not found: {filename}")
+            return None
+    except Exception as e:
+        st.error(f"Error loading model {filename}: {str(e)}")
+        st.text(traceback.format_exc())
+        return None
+
 # Load the models
-best_gb_churn_model = joblib.load('best_gb_churn_model.pkl')
-best_gb_fcr_model = joblib.load('best_gb_fcr_model.pkl')
-best_rf_churn_model = joblib.load('best_rf_churn_model.pkl')
-best_rf_fcr_model = joblib.load('best_rf_fcr_model.pkl')
+models = {
+    'best_gb_churn_model': load_model('best_gb_churn_model.pkl'),
+    'best_gb_fcr_model': load_model('best_gb_fcr_model.pkl'),
+    'best_rf_churn_model': load_model('best_rf_churn_model.pkl'),
+    'best_rf_fcr_model': load_model('best_rf_fcr_model.pkl')
+}
 
 # Function to make predictions
 def make_predictions(model, input_data):
-    return model.predict(input_data)
+    if model is None:
+        return None
+    try:
+        return model.predict(input_data)
+    except Exception as e:
+        st.error(f"Error making prediction: {str(e)}")
+        return None
 
 # Streamlit app
 st.title("Call Center Performance Predictor 📊")
@@ -96,74 +129,40 @@ with tab1:
     # Prepare input data
     input_data = np.array([[call_duration, hold_time, abandonment_rate, asa, acw, sentiment_score, csat, churn_rate, awt, aht, call_transfer_rate]])
 
-    if metric == "First Call Resolution (FCR)":
-        if model_type == "Gradient Boosting":
-            model = best_gb_fcr_model
-        else:
-            model = best_rf_fcr_model
-        st.write("### Predictions for First Call Resolution (FCR)")
-    else:
-        if model_type == "Gradient Boosting":
-            model = best_gb_churn_model
-        else:
-            model = best_rf_churn_model
-        st.write("### Predictions for Churn Rate")
+    # Select the appropriate model
+    model_key = f"best_{'gb' if model_type == 'Gradient Boosting' else 'rf'}_{('fcr' if metric == 'First Call Resolution (FCR)' else 'churn')}_model"
+    model = models[model_key]
 
-    prediction = make_predictions(model, input_data)[0]
-    st.write(f"Predicted {metric}: {prediction:.2f}")
+    if model is not None:
+        st.write(f"### Predictions for {metric}")
+        prediction = make_predictions(model, input_data)
+        if prediction is not None:
+            st.write(f"Predicted {metric}: {prediction[0]:.2f}")
 
-    # Feature importance
-    if st.checkbox("Show Feature Importance"):
-        if model_type == "Gradient Boosting":
-            if metric == "First Call Resolution (FCR)":
-                importances = best_gb_fcr_model.feature_importances_
+        # Feature importance
+        if st.checkbox("Show Feature Importance"):
+            if hasattr(model, 'feature_importances_'):
+                importances = model.feature_importances_
+                feature_names = ['Average Call Duration', 'Hold Time', 'Abandonment Rate', 'ASA', 'ACW', 'Sentiment Score', 'CSAT', 'Churn Rate', 'AWT', 'AHT', 'Call Transfer Rate']
+                feature_importance = pd.DataFrame({'Feature': feature_names, 'Importance': importances})
+                feature_importance = feature_importance.sort_values(by='Importance', ascending=False)
+                st.write("### Feature Importance")
+                st.write(feature_importance)
             else:
-                importances = best_gb_churn_model.feature_importances_
-        else:
-            if metric == "First Call Resolution (FCR)":
-                importances = best_rf_fcr_model.feature_importances_
-            else:
-                importances = best_rf_churn_model.feature_importances_
+                st.write("Feature importance not available for this model.")
 
-        feature_names = ['Average Call Duration', 'Hold Time', 'Abandonment Rate', 'ASA', 'ACW', 'Sentiment Score', 'CSAT', 'Churn Rate', 'AWT', 'AHT', 'Call Transfer Rate']
-        feature_importance = pd.DataFrame({'Feature': feature_names, 'Importance': importances})
-        feature_importance = feature_importance.sort_values(by='Importance', ascending=False)
-
-        st.write("### Feature Importance")
-        st.write(feature_importance)
-
-    # Model accuracy
-    if st.checkbox("Show Model Accuracy"):
-        if model_type == "Gradient Boosting":
-            if metric == "First Call Resolution (FCR)":
-                st.write(f"Model R-squared: {best_gb_fcr_model.score(X_test_fcr, y_test_fcr):.2f}")
-            else:
-                st.write(f"Model Accuracy: {best_gb_churn_model.score(X_test_churn, y_test_churn):.2f}")
-        else:
-            if metric == "First Call Resolution (FCR)":
-                st.write(f"Model R-squared: {best_rf_fcr_model.score(X_test_fcr, y_test_fcr):.2f}")
-            else:
-                st.write(f"Model Accuracy: {best_rf_churn_model.score(X_test_churn, y_test_churn):.2f}")
+        # Model accuracy
+        if st.checkbox("Show Model Accuracy"):
+            st.write("Model accuracy information not available. Please retrain the model with a test set to get accuracy metrics.")
 
 with tab2:
     st.title("Model Evaluation with Shapash")
-    
-    if st.button("Generate Shapash Report"):
-        # Prepare the SmartExplainer
-        if metric == "First Call Resolution (FCR)":
-            if model_type == "Gradient Boosting":
-                explainer = SmartExplainer(model=best_gb_fcr_model)
-            else:
-                explainer = SmartExplainer(model=best_rf_fcr_model)
+    st.write("Shapash integration is not implemented in this version of the app.")
+
+# Add this at the end of your script
+if st.button("Print Model Information"):
+    for name, model in models.items():
+        if model is not None:
+            st.write(f"{name}: {type(model).__name__}")
         else:
-            if model_type == "Gradient Boosting":
-                explainer = SmartExplainer(model=best_gb_churn_model)
-            else:
-                explainer = SmartExplainer(model=best_rf_churn_model)
-
-        explainer.compile(X_train_fcr, y_train_fcr)
-        
-        st.write(explainer.plot.features_importance())
-        st.write(explainer.plot.contribution_plot())
-
-        st.write("### Shapash Report Generated")
+            st.write(f"{name}: Not loaded")
