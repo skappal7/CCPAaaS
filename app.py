@@ -79,6 +79,10 @@ if uploaded_file is not None:
     # Calculate z-scores
     z_scores = calculate_z_scores(input_data, industry).squeeze()
 
+    # Debug prints to check lengths
+    st.write(f"Number of input metrics: {len(input_data.columns)}")
+    st.write(f"Number of z-scores: {len(z_scores)}")
+
     # Ensure z_scores and weights have the same length
     if len(z_scores) != len(input_data.columns):
         st.error("Mismatch in the number of z-scores and metrics. Please check the input data.")
