@@ -2,23 +2,20 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.ensemble import GradientBoostingRegressor
 import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Load the trained models
+# Load the trained models and preprocessing objects
 fcr_model = joblib.load('fcr_model.pkl')
 churn_model = joblib.load('churn_model.pkl')
-
-# Initialize label encoder and scaler
-label_encoder = LabelEncoder()
-scaler = StandardScaler()
+scaler = joblib.load('scaler.pkl')
+label_encoder = joblib.load('label_encoder.pkl')
 
 # Function to preprocess the input data
 def preprocess_data(input_data):
-    input_data['Industry'] = label_encoder.fit_transform(input_data['Industry'])
-    input_data_scaled = scaler.fit_transform(input_data)
+    input_data['Industry'] = label_encoder.transform(input_data['Industry'])
+    input_data_scaled = scaler.transform(input_data)
     return input_data_scaled
 
 # Function to display feature importance
@@ -70,9 +67,8 @@ input_data = pd.DataFrame({
     'Call Transfer Rate (%)': [call_transfer_rate]
 })
 
-# Fit the label encoder and scaler to the input data (for demo purposes)
-input_data['Industry'] = label_encoder.fit_transform(input_data['Industry'])
-input_data_scaled = scaler.fit_transform(input_data)
+# Preprocess input data
+input_data_scaled = preprocess_data(input_data)
 
 # Prediction and optimization
 st.subheader("Select the performance indicator to optimize:")
@@ -91,8 +87,4 @@ elif option == "Churn":
 # Documentation
 st.subheader("Documentation:")
 st.write("""
-- **Industry selection**: Choose the industry your data belongs to.
-- **Input section**: Enter your current performance metrics using the sliders.
-- **Prediction and optimization**: Select the performance indicator you want to optimize and get the prediction.
-- **Feature Importance**: View the chart to see which variables impact FCR or Churn the most.
-""")
+- **Industry selection**: Choose the industry your &#8203;:citation[oaicite:0]{index=0}&#8203;
