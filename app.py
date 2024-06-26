@@ -1,170 +1,78 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 import joblib
-import sys
-import sklearn
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier, GradientBoostingRegressor, RandomForestRegressor
-from sklearn.preprocessing import OneHotEncoder
 
-# Version check
-if sklearn.__version__ != '0.24.2':
-    st.error(f"Incorrect scikit-learn version. Expected 0.24.2, but got {sklearn.__version__}. Please update your requirements.txt file.")
-    st.stop()
+# Load the trained models
+fcr_model = joblib.load('fcr_model.pkl')
+churn_model = joblib.load('churn_model.pkl')
 
-# Set page config
-st.set_page_config(
-    page_title="Call Center Performance Prediction as a Platform",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+# Function to preprocess the input data
+def preprocess_data(input_data, label_encoder, scaler):
+    input_data['Industry'] = label_encoder.transform(input_data['Industry'])
+    input_data_scaled = scaler.transform(input_data)
+    return input_data_scaled
 
-# Custom CSS for the theme
-st.markdown(
-    """
-    <style>
-    .reportview-container {
-        background: #f5f5f5;
-        color: #333333;
-    }
-    .sidebar .sidebar-content {
-        background: #0052cc;
-        color: white;
-    }
-    .sidebar .sidebar-content .sidebar-collapse-control .icon {
-        color: white;
-    }
-    .sidebar .sidebar-content .sidebar-collapse-control .text {
-        color: white;
-    }
-    .sidebar .sidebar-content .sidebar-collapse-control:hover .icon {
-        color: #333333;
-    }
-    .sidebar .sidebar-content .sidebar-collapse-control:hover .text {
-        color: #333333;
-    }
-    .stButton>button {
-        color: #0052cc;
-        background: white;
-        border: 2px solid #0052cc;
-        padding: 0.25rem 0.5rem;
-        border-radius: 3px;
-    }
-    .stButton>button:hover {
-        color: white;
-        background: #0052cc;
-    }
-    .stTabs>div [data-baseweb="tab"] {
-        font-weight: bold;
-        color: #0052cc;
-    }
-    .stTabs>div [data-baseweb="tab"]:hover {
-        color: #002d80;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+# App title and description
+st.title("Performance Optimizer Pro")
+st.write("Predict and optimize your First Call Resolution (FCR) and Churn rates based on your performance metrics.")
 
-# Function to safely load models
-@st.cache_resource
-def load_model(filename):
-    try:
-        return joblib.load(filename)
-    except Exception as e:
-        st.warning(f"Error loading model {filename}: {str(e)}. Using a dummy model instead.")
-        if 'churn' in filename:
-            return GradientBoostingClassifier() if 'gb' in filename else RandomForestClassifier()
-        else:
-            return GradientBoostingRegressor() if 'gb' in filename else RandomForestRegressor()
+# Industry selection
+industries = ['Technology', 'Healthcare', 'Retail', 'Transportation', 'Finance']
+industry = st.selectbox("Select Industry", industries)
 
-# Load the models
-best_gb_churn_model = load_model('best_gb_churn_model.pkl')
-best_gb_fcr_model = load_model('best_gb_fcr_model.pkl')
-best_rf_churn_model = load_model('best_rf_churn_model.pkl')
-best_rf_fcr_model = load_model('best_rf_fcr_model.pkl')
+# Input section
+st.subheader("Input your current performance metrics:")
+average_call_duration = st.number_input("Average Call Duration (min)")
+hold_time = st.number_input("Hold Time (sec)")
+abandonment_rate = st.number_input("Abandonment Rate (%)")
+asa = st.number_input("ASA (sec)")
+acw = st.number_input("ACW (sec)")
+sentiment_score = st.number_input("Sentiment Score")
+csat = st.number_input("CSAT (%)")
+average_waiting_time = st.number_input("Average Waiting Time (AWT sec)")
+average_handle_time = st.number_input("Average Handle Time (AHT min)")
+call_transfer_rate = st.number_input("Call Transfer Rate (%)")
 
-# Function to make predictions
-def make_predictions(model, input_data):
-    try:
-        return model.predict(input_data)
-    except Exception as e:
-        st.error(f"Error making prediction: {str(e)}")
-        return None
+# Create a DataFrame from the input data
+input_data = pd.DataFrame({
+    'Industry': [industry],
+    'Average Call Duration (min)': [average_call_duration],
+    'Hold Time (sec)': [hold_time],
+    'Abandonment Rate (%)': [abandonment_rate],
+    'ASA (sec)': [asa],
+    'ACW (sec)': [acw],
+    'Sentiment Score': [sentiment_score],
+    'CSAT (%)': [csat],
+    'Average Waiting Time (AWT sec)': [average_waiting_time],
+    'Average Handle Time (AHT min)': [average_handle_time],
+    'Call Transfer Rate (%)': [call_transfer_rate]
+})
 
-# Streamlit app
-st.title("Call Center Performance Predictor 📊")
+# Fit and transform the label encoder and scaler within the app
+label_encoder = LabelEncoder()
+input_data['Industry'] = label_encoder.fit_transform(input_data['Industry'])
 
-# Tabs
-tab1, tab2 = st.tabs(["Predictions", "Model Evaluation"])
+scaler = StandardScaler()
+input_data_scaled = scaler.fit_transform(input_data)
 
-with tab1:
-    st.sidebar.title("Model and Metric Selection")
-    metric = st.sidebar.selectbox("Select the Metric to Improve", ("First Call Resolution (FCR)", "Churn Rate"))
-    model_type = st.sidebar.selectbox("Select the Model Type", ("Gradient Boosting", "Random Forest"))
+# Prediction and optimization
+st.subheader("Select the performance indicator to optimize:")
+option = st.selectbox("", ["First Call Resolution (FCR)", "Churn"])
 
-    st.sidebar.title("Input Your Current Performance Metrics")
-    call_duration = st.sidebar.number_input("Average Call Duration (min)", min_value=0.0, value=5.0)
-    hold_time = st.sidebar.number_input("Hold Time (sec)", min_value=0.0, value=30.0)
-    abandonment_rate = st.sidebar.number_input("Abandonment Rate (%)", min_value=0.0, value=5.0)
-    asa = st.sidebar.number_input("ASA (sec)", min_value=0.0, value=20.0)
-    acw = st.sidebar.number_input("ACW (sec)", min_value=0.0, value=15.0)
-    sentiment_score = st.sidebar.number_input("Sentiment Score", min_value=0.0, max_value=1.0, value=0.5)
-    csat = st.sidebar.number_input("CSAT (%)", min_value=0.0, max_value=100.0, value=80.0)
-    churn_rate = st.sidebar.number_input("Churn Rate (%)", min_value=0.0, max_value=100.0, value=10.0)
-    awt = st.sidebar.number_input("Average Waiting Time (AWT sec)", min_value=0.0, value=40.0)
-    aht = st.sidebar.number_input("Average Handle Time (AHT min)", min_value=0.0, value=10.0)
-    call_transfer_rate = st.sidebar.number_input("Call Transfer Rate (%)", min_value=0.0, value=10.0)
-    
-    # Industry selection (updated to match the model's expected categories)
-    industry_mapping = {
-        "Telecommunications": "Telecommunications",
-        "Healthcare": "Healthcare",
-        "Financial Services": "Finance",
-        "Retail": "Retail",
-        "Technology": "Technology",
-        "Transportation": "Transportation"
-    }
-    industry = st.sidebar.selectbox("Select Industry", list(industry_mapping.keys()))
-    
-    # Create one-hot encoded industry feature
-    encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
-    all_industries = list(industry_mapping.values())
-    encoder.fit([[ind] for ind in all_industries])
-    industry_encoded = encoder.transform([[industry_mapping[industry]]])
-    industry_columns = encoder.get_feature_names_out(['Industry'])
-    
-    # Prepare input data
-    input_data = np.array([[call_duration, hold_time, abandonment_rate, asa, acw, sentiment_score, 
-                            csat, churn_rate, awt, aht, call_transfer_rate]])
-    input_data = np.hstack((input_data, industry_encoded))
+if option == "First Call Resolution (FCR)":
+    prediction = fcr_model.predict(input_data_scaled)
+    st.write(f"Predicted FCR: {prediction[0]:.2f}%")
+elif option == "Churn":
+    prediction = churn_model.predict(input_data_scaled)
+    st.write(f"Predicted Churn Rate: {prediction[0]:.2f}%")
 
-    # Create feature names (matching the original training data)
-    feature_names = [
-        'Average Call Duration (min)', 'Hold Time (sec)', 'Abandonment Rate (%)', 'ASA (sec)', 'ACW (sec)', 
-        'Sentiment Score', 'CSAT (%)', 'Churn Rate (%)', 'Average Waiting Time (AWT sec)', 
-        'Average Handle Time (AHT min)', 'Call Transfer Rate (%)'] + list(industry_columns)
-
-    # Convert to DataFrame with feature names
-    input_df = pd.DataFrame(input_data, columns=feature_names)
-
-    # Debug: Print input data shape and columns
-    st.write(f"Input data shape: {input_df.shape}")
-    st.write(f"Input data columns: {input_df.columns}")
-
-    if metric == "First Call Resolution (FCR)":
-        if model_type == "Gradient Boosting":
-            model = best_gb_fcr_model
-        else:
-            model = best_rf_fcr_model
-        st.write("### Predictions for First Call Resolution (FCR)")
-    else:
-        if model_type == "Gradient Boosting":
-            model = best_gb_churn_model
-        else:
-            model = best_rf_churn_model
-        st.write("### Predictions for Churn Rate")
-
-    # Debug: Print model's expected feature names
-    if hasattr(model, 'feature_names_in
+# Documentation
+st.subheader("Documentation:")
+st.write("""
+- **Industry selection**: Choose the industry your data belongs to.
+- **Input section**: Enter your current performance metrics.
+- **Prediction and optimization**: Select the performance indicator you want to optimize and get the prediction.
+""")
