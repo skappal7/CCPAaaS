@@ -20,11 +20,29 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Custom CSS (unchanged)
+# Custom CSS
 st.markdown(
     """
     <style>
-    /* Your custom CSS here */
+    .reportview-container {
+        background: #f5f5f5;
+        color: #333333;
+    }
+    .sidebar .sidebar-content {
+        background: #0052cc;
+        color: white;
+    }
+    .stButton>button {
+        color: #0052cc;
+        background: white;
+        border: 2px solid #0052cc;
+        padding: 0.25rem 0.5rem;
+        border-radius: 3px;
+    }
+    .stButton>button:hover {
+        color: white;
+        background: #0052cc;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -63,7 +81,67 @@ st.title("Call Center Performance Predictor 📊")
 tab1, tab2 = st.tabs(["Predictions", "Model Evaluation"])
 
 with tab1:
-    # (Your existing code for tab1 goes here, unchanged)
+    st.sidebar.title("Model and Metric Selection")
+    metric = st.sidebar.selectbox("Select the Metric to Improve", ("First Call Resolution (FCR)", "Churn Rate"))
+    model_type = st.sidebar.selectbox("Select the Model Type", ("Gradient Boosting", "Random Forest"))
+
+    st.sidebar.title("Input Your Current Performance Metrics")
+    call_duration = st.sidebar.number_input("Average Call Duration (min)", min_value=0.0, value=5.0)
+    hold_time = st.sidebar.number_input("Hold Time (sec)", min_value=0.0, value=30.0)
+    abandonment_rate = st.sidebar.number_input("Abandonment Rate (%)", min_value=0.0, value=5.0)
+    asa = st.sidebar.number_input("ASA (sec)", min_value=0.0, value=20.0)
+    acw = st.sidebar.number_input("ACW (sec)", min_value=0.0, value=15.0)
+    sentiment_score = st.sidebar.number_input("Sentiment Score", min_value=0.0, max_value=1.0, value=0.5)
+    csat = st.sidebar.number_input("CSAT (%)", min_value=0.0, max_value=100.0, value=80.0)
+    churn_rate = st.sidebar.number_input("Churn Rate (%)", min_value=0.0, max_value=100.0, value=10.0)
+    awt = st.sidebar.number_input("Average Waiting Time (AWT sec)", min_value=0.0, value=40.0)
+    aht = st.sidebar.number_input("Average Handle Time (AHT min)", min_value=0.0, value=10.0)
+    call_transfer_rate = st.sidebar.number_input("Call Transfer Rate (%)", min_value=0.0, value=10.0)
+    
+    # Industry selection
+    industry = st.sidebar.selectbox("Select Industry", 
+                                    ["Telecommunications", "Healthcare", "Financial Services", "Retail", 
+                                     "Technology", "Travel and Hospitality", "Utilities", "E-commerce"])
+
+    # Create one-hot encoded industry feature
+    encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
+    industry_encoded = encoder.fit_transform([[industry]])
+    industry_columns = encoder.get_feature_names_out(['Industry'])
+    
+    # Prepare input data
+    input_data = np.array([[call_duration, hold_time, abandonment_rate, asa, acw, sentiment_score, 
+                            csat, churn_rate, awt, aht, call_transfer_rate]])
+    input_data = np.hstack((input_data, industry_encoded))
+
+    if metric == "First Call Resolution (FCR)":
+        if model_type == "Gradient Boosting":
+            model = best_gb_fcr_model
+        else:
+            model = best_rf_fcr_model
+        st.write("### Predictions for First Call Resolution (FCR)")
+    else:
+        if model_type == "Gradient Boosting":
+            model = best_gb_churn_model
+        else:
+            model = best_rf_churn_model
+        st.write("### Predictions for Churn Rate")
+
+    prediction = make_predictions(model, input_data)
+    if prediction is not None:
+        st.write(f"Predicted {metric}: {prediction[0]:.2f}")
+
+    # Feature importance
+    if st.checkbox("Show Feature Importance"):
+        if hasattr(model, 'feature_importances_'):
+            feature_names = ['Average Call Duration', 'Hold Time', 'Abandonment Rate', 'ASA', 'ACW', 
+                             'Sentiment Score', 'CSAT', 'Churn Rate', 'AWT', 'AHT', 'Call Transfer Rate'] + list(industry_columns)
+            importances = model.feature_importances_
+            feature_importance = pd.DataFrame({'Feature': feature_names, 'Importance': importances})
+            feature_importance = feature_importance.sort_values(by='Importance', ascending=False)
+            st.write("### Feature Importance")
+            st.write(feature_importance)
+        else:
+            st.write("Feature importance not available for this model.")
 
 with tab2:
     st.title("Model Evaluation")
