@@ -35,9 +35,6 @@ if uploaded_file is not None:
     # Preprocess data to calculate industry averages and standard deviations
     industry_stats = data.groupby('Industry').agg(['mean', 'std']).reset_index()
 
-    # Save the industry statistics for use in the app
-    # industry_stats.to_csv('industry_stats.csv', index=False)
-
     # Function to calculate z-scores
     def calculate_z_scores(input_data, industry):
         industry_mean = industry_stats[industry_stats['Industry'] == industry].xs('mean', level=1, axis=1)
@@ -80,51 +77,56 @@ if uploaded_file is not None:
     })
 
     # Calculate z-scores
-    z_scores = calculate_z_scores(input_data, industry)
+    z_scores = calculate_z_scores(input_data, industry).squeeze()
 
-    # Weighted sum for predictions (weights can be adjusted based on domain expertise)
-    weights = {
-        'Average Call Duration (min)': 0.2,
-        'Hold Time (sec)': 0.1,
-        'Abandonment Rate (%)': 0.15,
-        'ASA (sec)': 0.1,
-        'ACW (sec)': 0.05,
-        'Sentiment Score': 0.1,
-        'CSAT (%)': 0.1,
-        'Average Waiting Time (AWT sec)': 0.05,
-        'Average Handle Time (AHT min)': 0.05,
-        'Call Transfer Rate (%)': 0.1
-    }
-    predicted_fcr = np.sum(z_scores * list(weights.values()))
-    predicted_churn = np.sum(z_scores * list(weights.values()))
+    # Ensure z_scores and weights have the same length
+    if len(z_scores) != len(input_data.columns):
+        st.error("Mismatch in the number of z-scores and metrics. Please check the input data.")
+    else:
+        # Weighted sum for predictions (weights can be adjusted based on domain expertise)
+        weights = {
+            'Average Call Duration (min)': 0.2,
+            'Hold Time (sec)': 0.1,
+            'Abandonment Rate (%)': 0.15,
+            'ASA (sec)': 0.1,
+            'ACW (sec)': 0.05,
+            'Sentiment Score': 0.1,
+            'CSAT (%)': 0.1,
+            'Average Waiting Time (AWT sec)': 0.05,
+            'Average Handle Time (AHT min)': 0.05,
+            'Call Transfer Rate (%)': 0.1
+        }
 
-    # Display predictions
-    st.subheader("Predicted First Call Resolution (FCR) and Churn Rates")
-    st.write(f"Predicted FCR: {predicted_fcr:.2f}%")
-    st.write(f"Predicted Churn Rate: {predicted_churn:.2f}%")
+        weights_series = pd.Series(weights)
+        predicted_fcr = np.sum(z_scores * weights_series)
+        predicted_churn = np.sum(z_scores * weights_series)
 
-    # Visualization of impact
-    st.subheader("Impact of Metrics on Predictions")
-    impact_data = pd.DataFrame({
-        'Metric': input_data.columns,
-        'Impact on FCR': z_scores.values[0] * list(weights.values()),
-        'Impact on Churn': z_scores.values[0] * list(weights.values())
-    })
-    impact_data = impact_data.melt(id_vars='Metric', var_name='Prediction', value_name='Impact')
+        # Display predictions
+        st.subheader("Predicted First Call Resolution (FCR) and Churn Rates")
+        st.write(f"Predicted FCR: {predicted_fcr:.2f}%")
+        st.write(f"Predicted Churn Rate: {predicted_churn:.2f}%")
 
-    plt.figure(figsize=(10, 6))
-    sns.barplot(x='Impact', y='Metric', hue='Prediction', data=impact_data)
-    plt.title('Impact of Metrics on FCR and Churn Predictions')
-    st.pyplot(plt)
+        # Visualization of impact
+        st.subheader("Impact of Metrics on Predictions")
+        impact_data = pd.DataFrame({
+            'Metric': input_data.columns,
+            'Impact on FCR': z_scores * weights_series.values,
+            'Impact on Churn': z_scores * weights_series.values
+        })
+        impact_data = impact_data.melt(id_vars='Metric', var_name='Prediction', value_name='Impact')
 
-    # Documentation
-    st.subheader("Documentation:")
-    st.write("""
-    - **Industry selection**: Choose the industry your data belongs to.
-    - **Input section**: Enter your current performance metrics using the sliders.
-    - **Prediction and optimization**: The app uses statistical methods to predict FCR and Churn rates.
-    - **Impact Visualization**: See which metrics have the most impact on the predictions.
-    """)
+        plt.figure(figsize=(10, 6))
+        sns.barplot(x='Impact', y='Metric', hue='Prediction', data=impact_data)
+        plt.title('Impact of Metrics on FCR and Churn Predictions')
+        st.pyplot(plt)
+
+        # Documentation
+        st.subheader("Documentation:")
+        st.write("""
+        - **Industry selection**: Choose the industry your data belongs to.
+        - **Input section**: Enter your current performance metrics using the sliders.
+        - **Prediction and optimization**: The app uses statistical methods to predict FCR and Churn rates.
+        - **Impact Visualization**: See which metrics have the most impact on the predictions.
+        """)
 else:
     st.write("Please upload a CSV or Excel file to start the simulation.")
-
