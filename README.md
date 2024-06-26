@@ -39,7 +39,7 @@ Ensure you have the following dependencies installed. You can install them using
     ```
 2. Navigate to the project directory:
     ```bash
-    cd call-center-performance-predictor
+    cd CCPAaaS
     ```
 3. Install the dependencies:
     ```bash
