@@ -5,15 +5,35 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
+import os
+
+# Function to safely load models and preprocessing objects
+def safe_load(filename):
+    try:
+        return joblib.load(filename)
+    except FileNotFoundError:
+        st.error(f"Error: File '{filename}' not found. Please make sure it exists in the app directory.")
+    except Exception as e:
+        st.error(f"Error loading '{filename}': {str(e)}")
+    return None
+
+# Check if model files exist
+model_files = ['fcr_model.pkl', 'churn_model.pkl', 'scaler.pkl', 'label_encoder.pkl']
+missing_files = [file for file in model_files if not os.path.exists(file)]
+
+if missing_files:
+    st.error(f"The following required files are missing: {', '.join(missing_files)}")
+    st.error("Please ensure all model files are in the same directory as the app.")
+    st.stop()
 
 # Load the trained models and preprocessing objects
-try:
-    fcr_model = joblib.load('fcr_model.pkl')
-    churn_model = joblib.load('churn_model.pkl')
-    scaler = joblib.load('scaler.pkl')
-    label_encoder = joblib.load('label_encoder.pkl')
-except FileNotFoundError:
-    st.error("Error: Model files not found. Please make sure all required .pkl files are in the same directory as the app.")
+fcr_model = safe_load('fcr_model.pkl')
+churn_model = safe_load('churn_model.pkl')
+scaler = safe_load('scaler.pkl')
+label_encoder = safe_load('label_encoder.pkl')
+
+if None in [fcr_model, churn_model, scaler, label_encoder]:
+    st.error("Failed to load one or more required files. Please check the errors above.")
     st.stop()
 
 # Function to preprocess the input data
@@ -156,3 +176,8 @@ st.write("""
 - **Optimization Suggestions**: Get specific suggestions on how to improve your top influencing factors.
 - **Model Comparison**: Compare predictions from different machine learning models.
 """)
+
+# Display current working directory and files for debugging
+st.subheader("Debug Information:")
+st.write(f"Current working directory: {os.getcwd()}")
+st.write(f"Files in the current directory: {os.listdir('.')}")
