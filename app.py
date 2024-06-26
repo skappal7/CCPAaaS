@@ -49,46 +49,4 @@ acw = st.sidebar.slider("ACW (sec)", 0.0, 1000.0, 50.0)
 sentiment_score = st.sidebar.slider("Sentiment Score", 0.0, 100.0, 50.0)
 csat = st.sidebar.slider("CSAT (%)", 0.0, 100.0, 50.0)
 average_waiting_time = st.sidebar.slider("Average Waiting Time (AWT sec)", 0.0, 1000.0, 50.0)
-average_handle_time = st.sidebar.slider("Average Handle Time (AHT min)", 0.0, 60.0, 5.0)
-call_transfer_rate = st.sidebar.slider("Call Transfer Rate (%)", 0.0, 100.0, 5.0)
-
-# Create a DataFrame from the input data
-input_data = pd.DataFrame({
-    'Industry': [industry],
-    'Average Call Duration (min)': [average_call_duration],
-    'Hold Time (sec)': [hold_time],
-    'Abandonment Rate (%)': [abandonment_rate],
-    'ASA (sec)': [asa],
-    'ACW (sec)': [acw],
-    'Sentiment Score': [sentiment_score],
-    'CSAT (%)': [csat],
-    'Average Waiting Time (AWT sec)': [average_waiting_time],
-    'Average Handle Time (AHT min)': [average_handle_time],
-    'Call Transfer Rate (%)': [call_transfer_rate]
-})
-
-# Preprocess input data
-input_data_scaled = preprocess_data(input_data)
-
-# Prediction and optimization
-st.subheader("Select the performance indicator to optimize:")
-option = st.selectbox("", ["First Call Resolution (FCR)", "Churn"])
-
-if option == "First Call Resolution (FCR)":
-    prediction = fcr_model.predict(input_data_scaled)
-    st.write(f"Predicted FCR: {prediction[0]:.2f}%")
-    plot_feature_importance(fcr_model, input_data)
-
-elif option == "Churn":
-    prediction = churn_model.predict(input_data_scaled)
-    st.write(f"Predicted Churn Rate: {prediction[0]:.2f}%")
-    plot_feature_importance(churn_model, input_data)
-
-# Documentation
-st.subheader("Documentation:")
-st.write("""
-- **Industry selection**: Choose the industry your data belongs to.
-- **Input section**: Enter your current performance metrics using the sliders.
-- **Prediction and optimization**: Select the performance indicator you want to optimize and get the prediction.
-- **Feature Importance**: View the chart to see which variables impact FCR or Churn the most.
-""")
+average_handle &#8203;:citation[oaicite:0]{index=0}&#8203;
