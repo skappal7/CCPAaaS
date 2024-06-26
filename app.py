@@ -18,7 +18,7 @@ scaler = StandardScaler()
 # Function to preprocess the input data
 def preprocess_data(input_data):
     input_data['Industry'] = label_encoder.fit_transform(input_data['Industry'])
-    input_data_scaled = scaler.transform(input_data)
+    input_data_scaled = scaler.fit_transform(input_data)
     return input_data_scaled
 
 # Function to display feature importance
