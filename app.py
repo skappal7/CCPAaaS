@@ -1,18 +1,22 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.ensemble import GradientBoostingRegressor
 import joblib
 
 # Load the trained models
 fcr_model = joblib.load('fcr_model.pkl')
 churn_model = joblib.load('churn_model.pkl')
 
+# Initialize label encoder and scaler
+label_encoder = LabelEncoder()
+scaler = StandardScaler()
+
 # Function to preprocess the input data
-def preprocess_data(input_data, label_encoder, scaler):
-    input_data['Industry'] = label_encoder.transform(input_data['Industry'])
-    input_data_scaled = scaler.transform(input_data)
+def preprocess_data(input_data):
+    input_data['Industry'] = label_encoder.fit_transform(input_data['Industry'])
+    input_data_scaled = scaler.fit_transform(input_data)
     return input_data_scaled
 
 # App title and description
@@ -51,12 +55,8 @@ input_data = pd.DataFrame({
     'Call Transfer Rate (%)': [call_transfer_rate]
 })
 
-# Fit and transform the label encoder and scaler within the app
-label_encoder = LabelEncoder()
-input_data['Industry'] = label_encoder.fit_transform(input_data['Industry'])
-
-scaler = StandardScaler()
-input_data_scaled = scaler.fit_transform(input_data)
+# Preprocess input data
+input_data_scaled = preprocess_data(input_data)
 
 # Prediction and optimization
 st.subheader("Select the performance indicator to optimize:")
