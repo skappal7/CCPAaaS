@@ -8,8 +8,8 @@ from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier,
 from sklearn.preprocessing import OneHotEncoder
 
 # Version check
-if sklearn.__version__ != '1.2.2':
-    st.error(f"Incorrect scikit-learn version. Expected 1.2.2, but got {sklearn.__version__}. Please update your requirements.txt file.")
+if sklearn.__version__ != '0.24.2':
+    st.error(f"Incorrect scikit-learn version. Expected 0.24.2, but got {sklearn.__version__}. Please update your requirements.txt file.")
     st.stop()
 
 # Set page config
@@ -167,41 +167,4 @@ with tab1:
         st.write("### Predictions for Churn Rate")
 
     # Debug: Print model's expected feature names
-    if hasattr(model, 'feature_names_in_'):
-        st.write("Model's expected feature names:")
-        st.write(model.feature_names_in_)
-
-    prediction = make_predictions(model, input_df)
-    if prediction is not None:
-        st.write(f"Predicted {metric}: {prediction[0]:.2f}")
-
-    # Feature importance
-    if st.checkbox("Show Feature Importance"):
-        if hasattr(model, 'feature_importances_'):
-            importances = model.feature_importances_
-            feature_importance = pd.DataFrame({'Feature': feature_names, 'Importance': importances})
-            feature_importance = feature_importance.sort_values(by='Importance', ascending=False)
-            st.write("### Feature Importance")
-            st.write(feature_importance)
-        else:
-            st.write("Feature importance not available for this model.")
-
-with tab2:
-    st.title("Model Evaluation")
-    st.write("This section would typically contain model evaluation metrics and visualizations.")
-    st.write("For a complete implementation, you would need to have access to the test data and performance metrics.")
-
-# Debug information
-if st.checkbox("Show Debug Information"):
-    st.write("### Debug Information")
-    st.write(f"Python version: {sys.version}")
-    st.write(f"Pandas version: {pd.__version__}")
-    st.write(f"Numpy version: {np.__version__}")
-    st.write(f"Scikit-learn version: {sklearn.__version__}")
-    st.write(f"Joblib version: {joblib.__version__}")
-
-# Model information
-if st.checkbox("Show Model Information"):
-    st.write("### Model Information")
-    for name, model in {'GB Churn': best_gb_churn_model, 'GB FCR': best_gb_fcr_model, 
-                        'RF Churn': best_rf_churn_model, 'RF FCR': best_rf_fcr_model}.items
+    if hasattr(model, 'feature_names_in
