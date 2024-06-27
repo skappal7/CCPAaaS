@@ -61,6 +61,11 @@ st.markdown(
     .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4, .stMarkdown h5, .stMarkdown h6 {
         font-family: "Poppins", sans-serif;
     }
+    /* Custom styles for visualizations */
+    .matplotlib-figure {
+        font-family: "Poppins", sans-serif;
+        font-size: 9pt;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -68,12 +73,10 @@ st.markdown(
 
 # Function to process data
 def process_data(data):
-    # Data preprocessing
     if 'Year' in data.columns:
         data = data.drop(columns=['Year'])
     if 'Industry' in data.columns:
         data = data.drop(columns=['Industry'])
-    
     return data
 
 # Streamlit app
@@ -92,20 +95,22 @@ if uploaded_file:
     # Calculate correlation matrix
     correlation_matrix = data.corr()
 
-    # Create tabs
+    # Sidebar for metric adjustments
+    st.sidebar.header("Adjust Metrics")
+    inputs = {}
+    for column in data.columns.drop(['First Call Resolution (FCR %)', 'Churn Rate (%)']):
+        inputs[column] = st.sidebar.slider(f"{column}", min_value=float(data[column].min()), max_value=float(data[column].max()), value=float(means[column]), key=column)
+
+    # Main content area
     tab1, tab2 = st.tabs(["FCR and Churn Predictor", "Industry Trends"])
 
     with tab1:
-        # Expander section for metrics adjustment
-        with st.expander("Select Metrics"):
-            st.subheader("Adjust the Metrics")
-            inputs = {}
-            for column in data.columns.drop(['First Call Resolution (FCR %)', 'Churn Rate (%)']):
-                inputs[column] = st.slider(f"Adjust {column}", min_value=float(data[column].min()), max_value=float(data[column].max()), value=float(means[column]), key=column)
-
         # User input for desired improvement percentage
-        desired_fcr_improvement = st.number_input("Desired Improvement in FCR (%)", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
-        desired_churn_improvement = st.number_input("Desired Improvement in Churn (%)", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
+        col1, col2 = st.columns(2)
+        with col1:
+            desired_fcr_improvement = st.number_input("Desired Improvement in FCR (%)", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
+        with col2:
+            desired_churn_improvement = st.number_input("Desired Improvement in Churn (%)", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
 
         # Function to predict FCR and Churn based on weighted sum approach
         def predict_fcr_churn(inputs):
@@ -115,11 +120,11 @@ if uploaded_file:
             churn_pred = np.clip(churn_pred, 0, 100)
             return fcr_pred, churn_pred
 
-        # Function to calculate required metric improvements to improve FCR or Churn by a specified percentage
+        # Function to calculate required metric improvements
         def improvement_for_target(target, desired_improvement):
             improvements = {
                 "Metric": [],
-                "Required Improvement": [],
+                "Required Change": [],
                 "Change Direction": [],
                 "Units": []
             }
@@ -127,10 +132,10 @@ if uploaded_file:
                 correlation = correlation_matrix[target][metric]
                 if correlation != 0:
                     required_change = desired_improvement / correlation
-                    direction = "Increase" if correlation < 0 else "Decrease"
+                    direction = "Increase" if correlation > 0 else "Decrease"
                     units = "sec" if "Time" in metric or "ASA" in metric or "ACW" in metric or "AWT" in metric else ("%" if "%" in metric else "min")
                     improvements["Metric"].append(metric)
-                    improvements["Required Improvement"].append(f"{abs(required_change):.2f}")
+                    improvements["Required Change"].append(f"{abs(required_change):.2f}")
                     improvements["Change Direction"].append(direction)
                     improvements["Units"].append(units)
             
@@ -142,84 +147,44 @@ if uploaded_file:
             st.write(f"Predicted FCR: {fcr_pred:.2f}%")
             st.write(f"Predicted Churn: {churn_pred:.2f}%")
 
-            # Impact analysis
-            st.subheader("Impact Analysis")
-            impact_data = {
-                "Metric": [],
-                "FCR Impact (%)": [],
-                "Churn Impact (%)": []
-            }
-            for metric in inputs.keys():
-                fcr_impact = correlation_matrix['First Call Resolution (FCR %)'][metric]
-                churn_impact = correlation_matrix['Churn Rate (%)'][metric]
-                impact_data["Metric"].append(metric)
-                impact_data["FCR Impact (%)"].append(fcr_impact * 100)
-                impact_data["Churn Impact (%)"].append(churn_impact * 100)
-            
-            impact_df = pd.DataFrame(impact_data)
-            st.table(impact_df)
-
             # Required improvements for FCR and Churn improvement
-            st.subheader(f"Required Improvements for {desired_fcr_improvement}% FCR Improvement")
+            st.subheader(f"Required Changes for {desired_fcr_improvement}% FCR Improvement")
             fcr_improvement_df = improvement_for_target('First Call Resolution (FCR %)', desired_fcr_improvement)
             st.table(fcr_improvement_df)
 
-            st.subheader(f"Required Improvements for {desired_churn_improvement}% Churn Improvement")
+            st.subheader(f"Required Changes for {desired_churn_improvement}% Churn Improvement")
             churn_improvement_df = improvement_for_target('Churn Rate (%)', desired_churn_improvement)
             st.table(churn_improvement_df)
 
             # Fine print explanation
-            st.caption("The required improvements are calculated based on the correlation coefficients between each metric and the target variable (FCR or Churn). A positive correlation indicates the metric needs to be decreased, while a negative correlation indicates the metric needs to be increased. The units of measurement are derived from the original metric definitions.")
-
-            # Generate auto-comments based on predictions
-            st.subheader("Insights and Recommendations")
-            st.write("### FCR Insights")
-            if fcr_pred > means['First Call Resolution (FCR %)']:
-                st.write(f"The predicted FCR is above the average of {means['First Call Resolution (FCR %)']:.2f}%, indicating an efficient resolution process.")
-            else:
-                st.write(f"The predicted FCR is below the average of {means['First Call Resolution (FCR %)']:.2f}%. Consider optimizing your resolution strategies.")
-
-            st.write("### Churn Insights")
-            if churn_pred < means['Churn Rate (%)']:
-                st.write(f"The predicted Churn rate is below the average of {means['Churn Rate (%)']:.2f}%, indicating good customer retention.")
-            else:
-                st.write(f"The predicted Churn rate is above the average of {means['Churn Rate (%)']:.2f}%. Consider implementing strategies to improve customer satisfaction and retention.")
+            st.caption("These values are derived based on the correlation coefficients between each metric and the target variable (FCR or Churn). The required change is calculated as the desired improvement divided by the correlation coefficient. A positive correlation indicates the metric needs to be increased, while a negative correlation indicates the metric needs to be decreased. The actual impact may vary due to the complex relationships between variables.")
 
         # Visualizations in a collapsible section
         with st.expander("Visualizations"):
             st.subheader("Correlation Heatmap")
-            plt.figure(figsize=(8, 5))
-            sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm')
+            plt.figure(figsize=(10, 8))
+            sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt='.2f')
+            plt.title("Correlation Heatmap", fontsize=12, fontweight='bold')
+            plt.xticks(fontsize=9, fontfamily='Poppins')
+            plt.yticks(fontsize=9, fontfamily='Poppins')
             st.pyplot(plt.gcf())
 
             st.subheader("Relationships between Metrics")
             selected_metric = st.selectbox("Select Metric to Compare with FCR and Churn", data.columns.drop(['First Call Resolution (FCR %)', 'Churn Rate (%)']))
-            fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+            fig, ax = plt.subplots(1, 2, figsize=(12, 5))
             sns.scatterplot(data=data, x=selected_metric, y='First Call Resolution (FCR %)', ax=ax[0])
-            ax[0].set_title(f'{selected_metric} vs FCR')
+            ax[0].set_title(f'{selected_metric} vs FCR', fontsize=10, fontweight='bold')
+            ax[0].tick_params(labelsize=9)
             sns.scatterplot(data=data, x=selected_metric, y='Churn Rate (%)', ax=ax[1])
-            ax[1].set_title(f'{selected_metric} vs Churn')
+            ax[1].set_title(f'{selected_metric} vs Churn', fontsize=10, fontweight='bold')
+            ax[1].tick_params(labelsize=9)
+            plt.tight_layout()
             st.pyplot(fig)
 
     with tab2:
-        st.subheader("Industry Trends")
-        st.write("Analyze the uploaded data to make sense of the industry trends.")
-        st.dataframe(data)
+        st.write("Industry Trends tab content goes here.")
 
-    # Tech stack badges
-    st.markdown(
-        """
-        <div style='display: flex; justify-content: center;'>
-            <img src='https://img.shields.io/badge/Python-3.8-blue' style='margin: 5px;'>
-            <img src='https://img.shields.io/badge/Pandas-1.3.3-green' style='margin: 5px;'>
-            <img src='https://img.shields.io/badge/Streamlit-0.89.0-red' style='margin: 5px;'>
-            <img src='https://img.shields.io/badge/Matplotlib-3.4.3-orange' style='margin: 5px;'>
-            <img src='https://img.shields.io/badge/Seaborn-0.11.2-yellow' style='margin: 5px;'>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-else:
-    st.info("Please upload a CSV file to proceed.")
-
-       
+# Run the Streamlit app
+if __name__ == "__main__":
+    st.sidebar.markdown("---")
+    st.sidebar.write("Developed by Your Company Name")
