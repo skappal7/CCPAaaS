@@ -12,8 +12,8 @@ def process_data(data):
     data = data[numeric_columns]
     return data
 
-# Function to calculate improvements based on benchmarking
-def calculate_benchmark_improvements(data, target, industry_benchmark):
+# Function to calculate improvements based on benchmarking and relevant metrics
+def calculate_benchmark_improvements(data, target, relevant_metrics, industry_benchmark):
     improvements = {
         "Metric": [],
         "Current Value": [],
@@ -23,21 +23,22 @@ def calculate_benchmark_improvements(data, target, industry_benchmark):
         "Units": []
     }
 
-    for feature in data.columns:
-        current_value = data[feature].median()
-        benchmark_value = industry_benchmark.get(feature, np.nan)
-        if pd.notna(benchmark_value):
-            difference = current_value - benchmark_value
-            suggested_change = -difference  # To align with the benchmark
+    for feature in relevant_metrics:
+        if feature in data.columns:
+            current_value = data[feature].median()
+            benchmark_value = industry_benchmark.get(feature, np.nan)
+            if pd.notna(benchmark_value):
+                difference = current_value - benchmark_value
+                suggested_change = -difference  # To align with the benchmark
 
-            units = "sec" if "Time" in feature or "ASA" in feature or "ACW" in feature or "AWT" in feature else ("%" if "%" in feature else "min")
+                units = "sec" if "Time" in feature or "ASA" in feature or "ACW" in feature or "AWT" in feature else ("%" if "%" in feature else "min")
 
-            improvements["Metric"].append(feature)
-            improvements["Current Value"].append(f"{current_value:.2f}")
-            improvements["Benchmark Value"].append(f"{benchmark_value:.2f}")
-            improvements["Difference"].append(f"{difference:.2f}")
-            improvements["Suggested Change"].append(f"{suggested_change:+.2f}")
-            improvements["Units"].append(units)
+                improvements["Metric"].append(feature)
+                improvements["Current Value"].append(f"{current_value:.2f}")
+                improvements["Benchmark Value"].append(f"{benchmark_value:.2f}")
+                improvements["Difference"].append(f"{difference:.2f}")
+                improvements["Suggested Change"].append(f"{suggested_change:+.2f}")
+                improvements["Units"].append(units)
     
     return pd.DataFrame(improvements).sort_values("Difference", ascending=False)
 
@@ -66,8 +67,13 @@ if uploaded_file is not None:
             'Churn Rate (%)': 5.0,
             'Average Handling Time (AHT)': 300.0,
             'After Call Work (ACW)': 30.0,
-            'Average Speed of Answer (ASA)': 20.0
+            'Average Speed of Answer (ASA)': 20.0,
+            'Customer Satisfaction (CSAT)': 90.0
         }
+
+        # Define relevant metrics for FCR and Churn
+        relevant_metrics_fcr = ['Average Handling Time (AHT)', 'After Call Work (ACW)', 'Average Speed of Answer (ASA)']
+        relevant_metrics_churn = ['Customer Satisfaction (CSAT)', 'Average Speed of Answer (ASA)', 'After Call Work (ACW)']
 
         # Main content area
         tab1, tab2 = st.tabs(["FCR and Churn Predictor", "Industry Trends"])
@@ -90,14 +96,14 @@ if uploaded_file is not None:
             if st.button("Calculate Improvements"):
                 with st.spinner("Calculating improvements... This may take a moment."):
                     st.subheader(f"Suggested Changes for FCR Improvement")
-                    fcr_improvement_df = calculate_benchmark_improvements(data, 'First Call Resolution (FCR %)', industry_benchmark)
+                    fcr_improvement_df = calculate_benchmark_improvements(data, 'First Call Resolution (FCR %)', relevant_metrics_fcr, industry_benchmark)
                     if not fcr_improvement_df.empty:
                         st.table(fcr_improvement_df)
                     else:
                         st.write("No significant changes suggested for FCR improvement.")
                     
                     st.subheader(f"Suggested Changes for Churn Reduction")
-                    churn_improvement_df = calculate_benchmark_improvements(data, 'Churn Rate (%)', industry_benchmark)
+                    churn_improvement_df = calculate_benchmark_improvements(data, 'Churn Rate (%)', relevant_metrics_churn, industry_benchmark)
                     if not churn_improvement_df.empty:
                         st.table(churn_improvement_df)
                     else:
