@@ -34,26 +34,22 @@ def monte_carlo_simulation(data, target, num_simulations=10000):
 
 # Function to visualize Monte Carlo results
 def visualize_monte_carlo(simulations, target):
-    plt.figure(figsize=(10, 6))
-    sns.histplot(simulations, kde=True, bins=50)
-    plt.title(f'Monte Carlo Simulation Results for {target}')
-    plt.xlabel(f'{target} (%)')
-    plt.ylabel('Frequency')
-    st.pyplot(plt)
-    
-    # Boxplot
-    plt.figure(figsize=(10, 6))
-    sns.boxplot(x=simulations)
-    plt.title(f'Boxplot of Monte Carlo Simulation Results for {target}')
-    plt.xlabel(f'{target} (%)')
-    st.pyplot(plt)
-    
-    # Cumulative distribution plot
-    plt.figure(figsize=(10, 6))
-    sns.ecdfplot(simulations)
-    plt.title(f'Cumulative Distribution of Monte Carlo Simulation Results for {target}')
-    plt.xlabel(f'{target} (%)')
-    st.pyplot(plt)
+    fig, ax = plt.subplots(1, 3, figsize=(18, 6))
+
+    sns.histplot(simulations, kde=True, bins=50, ax=ax[0])
+    ax[0].set_title(f'Histogram of {target}')
+    ax[0].set_xlabel(f'{target} (%)')
+    ax[0].set_ylabel('Frequency')
+
+    sns.boxplot(x=simulations, ax=ax[1])
+    ax[1].set_title(f'Boxplot of {target}')
+    ax[1].set_xlabel(f'{target} (%)')
+
+    sns.ecdfplot(simulations, ax=ax[2])
+    ax[2].set_title(f'Cumulative Distribution of {target}')
+    ax[2].set_xlabel(f'{target} (%)')
+
+    st.pyplot(fig)
 
 # Streamlit app
 st.set_page_config(page_title="Call Center FCR and Churn Predictor", page_icon=":phone:", layout="wide")
@@ -100,10 +96,10 @@ with tab1:
     fcr_delta = current_fcr - benchmark_fcr
     churn_delta = current_churn - benchmark_churn
     with col1:
-        st.metric("Your FCR", f"{current_fcr:.2f}%", f"{fcr_delta:.2f}% from industry median", delta_color="normal" if fcr_delta >= 0 else "inverse")
+        st.metric("Your FCR", f"{current_fcr:.2f}%", f"{fcr_delta:.2f}% from industry median")
         st.metric("Industry FCR", f"{benchmark_fcr:.2f}%")
     with col2:
-        st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{churn_delta:.2f}% from industry median", delta_color="inverse" if churn_delta >= 0 else "normal")
+        st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{churn_delta:.2f}% from industry median")
         st.metric("Industry Churn Rate", f"{benchmark_churn:.2f}%")
 
     # Monte Carlo Simulation for FCR and Churn Prediction
@@ -118,11 +114,17 @@ with tab1:
             
             # Provide summary and insights
             st.subheader("Simulation Summary and Insights")
-            st.write(f"The average simulated {target_variable} is {np.mean(simulations):.2f}%.")
-            st.write(f"The median simulated {target_variable} is {np.median(simulations):.2f}%.")
-            st.write(f"The standard deviation of the simulated {target_variable} is {np.std(simulations):.2f}.")
-            st.write(f"The 95% confidence interval for {target_variable} is ({np.percentile(simulations, 2.5):.2f}%, {np.percentile(simulations, 97.5):.2f}%).")
-            st.write("These results provide a range of potential outcomes based on the simulated scenarios. Use this information to guide decisions on performance improvements.")
+            mean_sim = np.mean(simulations)
+            median_sim = np.median(simulations)
+            std_sim = np.std(simulations)
+            ci_low, ci_high = np.percentile(simulations, [2.5, 97.5])
+            probability = np.mean(np.array(simulations) > current_fcr if target_variable == "First Call Resolution (FCR %)" else current_churn) * 100
+
+            st.write(f"The average simulated {target_variable} is **{mean_sim:.2f}%**.")
+            st.write(f"The median simulated {target_variable} is **{median_sim:.2f}%**.")
+            st.write(f"The standard deviation of the simulated {target_variable} is **{std_sim:.2f}**.")
+            st.write(f"The 95% confidence interval for {target_variable} is **({ci_low:.2f}%, {ci_high:.2f}%)**.")
+            st.write(f"The probability of achieving more than the current {target_variable} is **{probability:.2f}%**.")
 
     # Correlation tables
     st.subheader("Correlations with FCR and Churn")
