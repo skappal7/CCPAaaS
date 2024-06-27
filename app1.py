@@ -4,6 +4,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+# Function to process data
+def process_data(data):
+    # Remove 'Year' and 'Industry' columns if they exist
+    columns_to_drop = ['Year', 'Industry']
+    data = data.drop(columns=[col for col in columns_to_drop if col in data.columns])
+    
+    # Keep only numeric columns
+    numeric_columns = data.select_dtypes(include=[np.number]).columns
+    data = data[numeric_columns]
+    
+    return data
+
 # Custom Random Forest-like feature importance
 def custom_feature_importance(X, y, n_iterations=100, sample_size=0.8):
     n_samples, n_features = X.shape
@@ -61,6 +73,7 @@ uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
 if uploaded_file is not None:
     try:
         data = pd.read_csv(uploaded_file)
+        data = process_data(data)
         
         # Calculate median for each metric
         medians = data.median()
@@ -160,7 +173,7 @@ if uploaded_file is not None:
 
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
-        st.write("Please check your CSV file and try again.")
+        st.write("Please check your CSV file and try again. Ensure all relevant columns contain numeric data.")
 
 # Run the Streamlit app
 if __name__ == "__main__":
