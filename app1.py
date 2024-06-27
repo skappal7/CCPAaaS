@@ -86,10 +86,12 @@ if uploaded_file is not None:
         with tab1:
             st.subheader("Performance Comparison")
             col1, col2 = st.columns(2)
+            fcr_delta = medians['First Call Resolution (FCR %)'] - benchmark_fcr
+            churn_delta = medians['Churn Rate (%)'] - benchmark_churn
             with col1:
-                st.metric("Your FCR", f"{medians['First Call Resolution (FCR %)']:.2f}%", f"{medians['First Call Resolution (FCR %)'] - benchmark_fcr:.2f}% from industry median")
+                st.metric("Your FCR", f"{medians['First Call Resolution (FCR %)']:.2f}%", f"{fcr_delta:.2f}% from industry median", delta_color="inverse" if fcr_delta >= 0 else "normal")
             with col2:
-                st.metric("Your Churn Rate", f"{medians['Churn Rate (%)']:.2f}%", f"{medians['Churn Rate (%)'] - benchmark_churn:.2f}% from industry median")
+                st.metric("Your Churn Rate", f"{medians['Churn Rate (%)']:.2f}%", f"{churn_delta:.2f}% from industry median", delta_color="inverse" if churn_delta <= 0 else "normal")
 
             # Monte Carlo Simulation for FCR and Churn Prediction
             st.subheader("Monte Carlo Simulation")
