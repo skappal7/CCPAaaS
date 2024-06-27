@@ -35,23 +35,6 @@ if uploaded_file is not None:
     # Preprocess data to calculate industry averages and standard deviations
     industry_stats = data.groupby('Industry').agg(['mean', 'std']).reset_index()
 
-    # Identify common columns across all industries
-    common_columns = set(industry_stats.columns.levels[0])
-    common_columns.discard('Industry')  # Remove 'Industry' from common columns
-    
-    # Function to calculate z-scores
-    def calculate_z_scores(input_data, industry):
-        # Select the relevant industry statistics
-        industry_mean = industry_stats[industry_stats['Industry'] == industry].xs('mean', level=1, axis=1)[common_columns]
-        industry_std = industry_stats[industry_stats['Industry'] == industry].xs('std', level=1, axis=1)[common_columns]
-        
-        # Align columns
-        input_data = input_data[common_columns]
-        
-        # Calculate z-scores
-        z_scores = (input_data - industry_mean) / industry_std
-        return z_scores
-
     # Sidebar for user inputs
     st.sidebar.title("Input Metrics")
     st.sidebar.write("Enter your current performance metrics.")
@@ -61,16 +44,44 @@ if uploaded_file is not None:
     industry = st.sidebar.selectbox("Select Industry", industries)
 
     # Input section
-    input_data = {}
-    for column in common_columns:
-        max_value = data[column].max()
-        min_value = data[column].min()
-        if 'Rate' in column or 'Score' in column or 'CSAT' in column:
-            input_data[column] = st.sidebar.slider(f"{column}", 0.0, 100.0, 50.0)
-        elif 'Time' in column or 'Duration' in column or 'Handle' in column:
-            input_data[column] = st.sidebar.slider(f"{column}", 0.0, max_value, min_value + (max_value - min_value) / 2)
-    
-    input_data = pd.DataFrame(input_data, index=[0])
+    average_call_duration = st.sidebar.slider("Average Call Duration (min)", 0.0, 60.0, 5.0)
+    hold_time = st.sidebar.slider("Hold Time (sec)", 0.0, 1000.0, 50.0)
+    abandonment_rate = st.sidebar.slider("Abandonment Rate (%)", 0.0, 100.0, 5.0)
+    asa = st.sidebar.slider("ASA (sec)", 0.0, 1000.0, 50.0)
+    acw = st.sidebar.slider("ACW (sec)", 0.0, 1000.0, 50.0)
+    sentiment_score = st.sidebar.slider("Sentiment Score", 0.0, 100.0, 50.0)
+    csat = st.sidebar.slider("CSAT (%)", 0.0, 100.0, 50.0)
+    average_waiting_time = st.sidebar.slider("Average Waiting Time (AWT sec)", 0.0, 1000.0, 50.0)
+    average_handle_time = st.sidebar.slider("Average Handle Time (AHT min)", 0.0, 60.0, 5.0)
+    call_transfer_rate = st.sidebar.slider("Call Transfer Rate (%)", 0.0, 100.0, 5.0)
+
+    # Create a DataFrame from the input data
+    input_data = pd.DataFrame({
+        'Average Call Duration (min)': [average_call_duration],
+        'Hold Time (sec)': [hold_time],
+        'Abandonment Rate (%)': [abandonment_rate],
+        'ASA (sec)': [asa],
+        'ACW (sec)': [acw],
+        'Sentiment Score': [sentiment_score],
+        'CSAT (%)': [csat],
+        'Average Waiting Time (AWT sec)': [average_waiting_time],
+        'Average Handle Time (AHT min)': [average_handle_time],
+        'Call Transfer Rate (%)': [call_transfer_rate]
+    })
+
+    # Function to calculate z-scores
+    def calculate_z_scores(input_data, industry):
+        # Select the relevant industry statistics
+        industry_mean = industry_stats[industry_stats['Industry'] == industry].xs('mean', level=1, axis=1)
+        industry_std = industry_stats[industry_stats['Industry'] == industry].xs('std', level=1, axis=1)
+        
+        # Align columns
+        industry_mean = industry_mean[input_data.columns]
+        industry_std = industry_std[input_data.columns]
+        
+        # Calculate z-scores
+        z_scores = (input_data - industry_mean) / industry_std
+        return z_scores
 
     # Calculate z-scores
     z_scores = calculate_z_scores(input_data, industry).squeeze()
@@ -97,10 +108,7 @@ if uploaded_file is not None:
             'Call Transfer Rate (%)': 0.1
         }
 
-        # Filter weights to match common columns
-        filtered_weights = {k: v for k, v in weights.items() if k in common_columns}
-        weights_series = pd.Series(filtered_weights)
-        
+        weights_series = pd.Series(weights)
         predicted_fcr = np.sum(z_scores * weights_series)
         predicted_churn = np.sum(z_scores * weights_series)
 
