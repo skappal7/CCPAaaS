@@ -12,10 +12,27 @@ def load_data():
 data = load_data()
 
 # Data preprocessing
-data = data.drop(columns=['year'])
-means = data.mean()
-stds = data.std()
-correlation_matrix = data.corr()
+if 'year' in data.columns:
+    data = data.drop(columns=['year'])
+else:
+    st.warning("'year' column not found in the data.")
+
+# Assuming 'industry' is a column in the dataset for filtering
+industries = data['industry'].unique()
+selected_industry = st.selectbox("Select Industry", industries)
+
+# Filter data by selected industry
+industry_data = data[data['industry'] == selected_industry]
+
+# Drop industry column for calculations
+industry_data = industry_data.drop(columns=['industry'])
+
+# Calculate mean and standard deviation for each metric
+means = industry_data.mean()
+stds = industry_data.std()
+
+# Calculate correlation matrix
+correlation_matrix = industry_data.corr()
 
 # Function to calculate z-scores
 def calculate_z_score(value, mean, std):
@@ -36,8 +53,8 @@ st.title("Call Center FCR and Churn Predictor")
 # User inputs via sliders
 inputs = {}
 st.subheader("Adjust the Metrics")
-for column in data.columns.drop(['FCR', 'Churn']):
-    inputs[column] = st.slider(f"Adjust {column}", min_value=float(data[column].min()), max_value=float(data[column].max()), value=float(means[column]))
+for column in industry_data.columns.drop(['FCR', 'Churn']):
+    inputs[column] = st.slider(f"Adjust {column}", min_value=float(industry_data[column].min()), max_value=float(industry_data[column].max()), value=float(means[column]))
 
 # Predict button
 if st.button("Predict FCR and Churn"):
