@@ -51,17 +51,12 @@ industry_benchmarks = {
     "Finance": {'FCR': 82, 'Churn': 8}
 }
 
-# Sidebar for industry selection and metric adjustments
+# Sidebar for industry selection and current performance input
 st.sidebar.header("Settings")
 
 industry = st.sidebar.selectbox("Select Industry", options=list(industry_benchmarks.keys()))
 benchmark_fcr = industry_benchmarks[industry]['FCR']
 benchmark_churn = industry_benchmarks[industry]['Churn']
-
-aht_change = st.sidebar.slider("Change in AHT (min)", min_value=-100, max_value=100, value=0, step=5)
-acw_change = st.sidebar.slider("Change in ACW (min)", min_value=-20, max_value=20, value=0, step=1)
-asa_change = st.sidebar.slider("Change in ASA (min)", min_value=-10, max_value=10, value=0, step=1)
-csat_change = st.sidebar.slider("Change in CSAT (%)", min_value=-10, max_value=10, value=0, step=1)
 
 # Sidebar for current performance input
 st.sidebar.header("Current Performance")
@@ -103,12 +98,6 @@ if uploaded_file is not None:
             
             if st.button("Run Monte Carlo Simulation"):
                 with st.spinner("Running Monte Carlo simulations..."):
-                    # Apply changes to data
-                    data['Average Handling Time (AHT)'] = np.maximum(0, data['Average Handling Time (AHT)'] + aht_change)
-                    data['After Call Work (ACW)'] = np.maximum(0, data['After Call Work (ACW)'] + acw_change)
-                    data['Average Speed of Answer (ASA)'] = np.maximum(0, data['Average Speed of Answer (ASA)'] + asa_change)
-                    data['Customer Satisfaction (CSAT)'] = np.maximum(0, data['Customer Satisfaction (CSAT)'] + csat_change)
-
                     simulations = monte_carlo_simulation(data, target_variable, num_simulations)
                     visualize_monte_carlo(simulations, target_variable)
                     
