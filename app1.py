@@ -1,8 +1,9 @@
-import streamlit as st
+Vimport streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import statsmodels.api as sm
 
 # Function to process data
 def process_data(data):
@@ -12,35 +13,37 @@ def process_data(data):
     data = data[numeric_columns]
     return data
 
-# Function to calculate improvements based on benchmarking
-def calculate_benchmark_improvements(data, target, relevant_metrics, industry_benchmark):
-    improvements = {
-        "Metric": [],
-        "Current Value": [],
-        "Benchmark Value": [],
-        "Difference": [],
-        "Suggested Change": [],
-        "Units": []
-    }
+# Function to perform logistic regression
+def logistic_regression(data, target):
+    X = data.drop(columns=[target])
+    X = sm.add_constant(X)
+    y = (data[target] > data[target].median()).astype(int)  # Convert target to binary based on median
+    model = sm.Logit(y, X).fit()
+    return model
 
-    for feature in relevant_metrics:
-        if feature in data.columns:
-            current_value = data[feature].median()
-            benchmark_value = industry_benchmark.get(feature, np.nan)
-            if pd.notna(benchmark_value):
-                difference = current_value - benchmark_value
-                suggested_change = -difference  # To align with the benchmark
+# Function to perform linear regression
+def linear_regression(data, target):
+    X = data.drop(columns=[target])
+    X = sm.add_constant(X)
+    y = data[target]
+    model = sm.OLS(y, X).fit()
+    return model
 
-                units = "sec" if "Time" in feature or "ASA" in feature or "ACW" in feature or "AWT" in feature else ("%" if "%" in feature else "min")
-
-                improvements["Metric"].append(feature)
-                improvements["Current Value"].append(f"{current_value:.2f}")
-                improvements["Benchmark Value"].append(f"{benchmark_value:.2f}")
-                improvements["Difference"].append(f"{difference:.2f}")
-                improvements["Suggested Change"].append(f"{suggested_change:+.2f}")
-                improvements["Units"].append(units)
-    
-    return pd.DataFrame(improvements).sort_values("Difference", ascending=False)
+# Rule-Based Recommendations
+def rule_based_recommendations(target):
+    if target == 'First Call Resolution (FCR %)':
+        return [
+            {'metric': 'Average Handling Time (AHT)', 'suggestion': 'Reduce by 10%'},
+            {'metric': 'After Call Work (ACW)', 'suggestion': 'Reduce by 5%'},
+            {'metric': 'Average Speed of Answer (ASA)', 'suggestion': 'Reduce by 5 seconds'}
+        ]
+    elif target == 'Churn Rate (%)':
+        return [
+            {'metric': 'Customer Satisfaction (CSAT)', 'suggestion': 'Increase by 5%'},
+            {'metric': 'Average Speed of Answer (ASA)', 'suggestion': 'Reduce by 3 seconds'},
+            {'metric': 'After Call Work (ACW)', 'suggestion': 'Reduce by 5%'}
+        ]
+    return []
 
 # Streamlit app
 st.set_page_config(page_title="Call Center FCR and Churn Predictor", page_icon=":phone:", layout="wide")
@@ -61,20 +64,6 @@ if uploaded_file is not None:
         current_fcr = st.sidebar.number_input("Current FCR (%)", min_value=0.0, max_value=100.0, value=float(medians['First Call Resolution (FCR %)']))
         current_churn = st.sidebar.number_input("Current Churn Rate (%)", min_value=0.0, max_value=100.0, value=float(medians['Churn Rate (%)']))
 
-        # Industry benchmarks (example values)
-        industry_benchmark = {
-            'First Call Resolution (FCR %)': 85.0,
-            'Churn Rate (%)': 5.0,
-            'Average Handling Time (AHT)': 300.0,
-            'After Call Work (ACW)': 30.0,
-            'Average Speed of Answer (ASA)': 20.0,
-            'Customer Satisfaction (CSAT)': 90.0
-        }
-
-        # Define relevant metrics for FCR and Churn
-        relevant_metrics_fcr = ['Average Handling Time (AHT)', 'After Call Work (ACW)', 'Average Speed of Answer (ASA)']
-        relevant_metrics_churn = ['Customer Satisfaction (CSAT)', 'Average Speed of Answer (ASA)', 'After Call Work (ACW)']
-
         # Main content area
         tab1, tab2 = st.tabs(["FCR and Churn Predictor", "Industry Trends"])
 
@@ -82,48 +71,62 @@ if uploaded_file is not None:
             st.subheader("Performance Comparison")
             col1, col2 = st.columns(2)
             with col1:
-                st.metric("Your FCR", f"{current_fcr:.2f}%", f"{current_fcr - industry_benchmark['First Call Resolution (FCR %)']:.2f}%")
-                st.metric("Industry Median FCR", f"{industry_benchmark['First Call Resolution (FCR %)']:.2f}%")
+                st.metric("Your FCR", f"{current_fcr:.2f}%", f"{current_fcr - medians['First Call Resolution (FCR %)']:.2f}%")
             with col2:
-                st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{current_churn - industry_benchmark['Churn Rate (%)']:.2f}%")
-                st.metric("Industry Median Churn Rate", f"{industry_benchmark['Churn Rate (%)']:.2f}%")
+                st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{current_churn - medians['Churn Rate (%)']:.2f}%")
 
-            # User input for desired improvement percentage
-            desired_fcr_improvement = st.number_input("Desired Improvement in FCR (%)", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
-            desired_churn_improvement = st.number_input("Desired Reduction in Churn (%)", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
+            # Logistic Regression for Churn Prediction
+            st.subheader("Logistic Regression for Churn Prediction")
+            target_churn = 'Churn Rate (%)'
+            logit_model = logistic_regression(data, target_churn)
+            st.write("Logistic Regression Model Summary:")
+            st.write(logit_model.summary())
 
-            # Calculate and display improvements based on benchmarking
-            if st.button("Calculate Improvements"):
-                with st.spinner("Calculating improvements... This may take a moment."):
-                    st.subheader(f"Suggested Changes for FCR Improvement")
-                    fcr_improvement_df = calculate_benchmark_improvements(data, 'First Call Resolution (FCR %)', relevant_metrics_fcr, industry_benchmark)
-                    if not fcr_improvement_df.empty:
-                        st.table(fcr_improvement_df)
-                    else:
-                        st.write("No significant changes suggested for FCR improvement.")
+            # Linear Regression for FCR Prediction
+            st.subheader("Linear Regression for FCR Prediction")
+            target_fcr = 'First Call Resolution (FCR %)'
+            linreg_model = linear_regression(data, target_fcr)
+            st.write("Linear Regression Model Summary:")
+            st.write(linreg_model.summary())
+
+            # Rule-Based Recommendations
+            st.subheader("Rule-Based Recommendations")
+            selected_target = st.selectbox("Select Target Variable", options=["First Call Resolution (FCR %)", "Churn Rate (%)"])
+            recommendations = rule_based_recommendations(selected_target)
+            st.write("Recommendations:")
+            for rec in recommendations:
+                st.write(f"{rec['metric']}: {rec['suggestion']}")
+
+            # Simplified Simulation
+            st.subheader("Simplified Simulation")
+            st.write("Adjust the metrics to see the projected impact on FCR and Churn Rate:")
+
+            aht_change = st.slider("Change in AHT (sec)", min_value=-100, max_value=100, value=0, step=5)
+            acw_change = st.slider("Change in ACW (sec)", min_value=-20, max_value=20, value=0, step=1)
+            asa_change = st.slider("Change in ASA (sec)", min_value=-10, max_value=10, value=0, step=1)
+            csat_change = st.slider("Change in CSAT (%)", min_value=-10, max_value=10, value=0, step=1)
+
+            changes = {
+                'Average Handling Time (AHT)': aht_change,
+                'After Call Work (ACW)': acw_change,
+                'Average Speed of Answer (ASA)': asa_change,
+                'Customer Satisfaction (CSAT)': csat_change
+            }
+
+            if st.button("Simulate Impact"):
+                with st.spinner("Simulating impact..."):
+                    # Apply changes to data
+                    simulated_data = data.copy()
+                    for feature, change in changes.items():
+                        if feature in simulated_data.columns:
+                            simulated_data[feature] += change
                     
-                    st.subheader(f"Suggested Changes for Churn Reduction")
-                    churn_improvement_df = calculate_benchmark_improvements(data, 'Churn Rate (%)', relevant_metrics_churn, industry_benchmark)
-                    if not churn_improvement_df.empty:
-                        st.table(churn_improvement_df)
-                    else:
-                        st.write("No significant changes suggested for Churn reduction.")
+                    # Predict new FCR and Churn values
+                    simulated_fcr = linreg_model.predict(sm.add_constant(simulated_data.drop(columns=[target_fcr]))).mean()
+                    simulated_churn = logit_model.predict(sm.add_constant(simulated_data.drop(columns=[target_churn]))).mean()
 
-                # Explanations
-                if not fcr_improvement_df.empty or not churn_improvement_df.empty:
-                    st.subheader("Improvement Explanations")
-                    for _, row in fcr_improvement_df.iterrows():
-                        metric, change, units, importance = row['Metric'], float(row['Suggested Change']), row['Units'], float(row['Difference'])
-                        direction = "increase" if change > 0 else "decrease"
-                        st.write(f"- To improve FCR, consider {direction}ing {metric} by {abs(change):.2f} {units}. (Difference: {importance:.2f})")
-                    
-                    for _, row in churn_improvement_df.iterrows():
-                        metric, change, units, importance = row['Metric'], float(row['Suggested Change']), row['Units'], float(row['Difference'])
-                        direction = "increase" if change > 0 else "decrease"
-                        st.write(f"- To reduce Churn, consider {direction}ing {metric} by {abs(change):.2f} {units}. (Difference: {importance:.2f})")
-
-                # Fine print explanation
-                st.caption("These suggestions are based on benchmarking against industry standards. The 'Difference' score indicates how much each metric deviates from the benchmark. Use these as general guidance and consider the practical implications of each change in your specific context.")
+                    st.metric("Simulated FCR", f"{simulated_fcr:.2f}%")
+                    st.metric("Simulated Churn Rate", f"{simulated_churn:.2f}%")
 
             # Visualizations in a collapsible section
             with st.expander("Visualizations"):
