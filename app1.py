@@ -14,10 +14,11 @@ data = load_data()
 # Data preprocessing
 if 'year' in data.columns:
     data = data.drop(columns=['year'])
-else:
-    st.warning("'year' column not found in the data.")
+if 'industry' not in data.columns:
+    st.error("The data does not contain an 'industry' column.")
+    st.stop()
 
-# Assuming 'industry' is a column in the dataset for filtering
+# Industry selection
 industries = data['industry'].unique()
 selected_industry = st.selectbox("Select Industry", industries)
 
@@ -65,4 +66,7 @@ if st.button("Predict FCR and Churn"):
     # Impact analysis
     st.subheader("Impact Analysis")
     for metric in inputs.keys():
-        st.write(f"Adjusting {metric} by 1% changes FCR by {correlation_matrix['FCR'][metric]:.2f}% and Churn by {correlation_matrix['Churn'][metric]:.2f}%")
+        fcr_impact = correlation_matrix['FCR'][metric]
+        churn_impact = correlation_matrix['Churn'][metric]
+        st.write(f"Adjusting {metric} by 1% changes FCR by {fcr_impact:.2f}% and Churn by {churn_impact:.2f}%")
+
