@@ -6,9 +6,19 @@ import seaborn as sns
 
 # Function to process and normalize data
 def process_data(data):
+    # Remove 'Industry' and 'Year' columns if they exist
+    columns_to_drop = ['Industry', 'Year']
+    data = data.drop(columns=[col for col in columns_to_drop if col in data.columns])
+    
     # Keep only numeric columns
     numeric_columns = data.select_dtypes(include=[np.number]).columns
     data = data[numeric_columns]
+    
+    # Check if required columns exist
+    required_columns = ['First Call Resolution (FCR %)', 'Churn Rate (%)']
+    for col in required_columns:
+        if col not in data.columns:
+            raise ValueError(f"Required column '{col}' not found in the data.")
     
     # Normalize data
     return (data - data.min()) / (data.max() - data.min())
@@ -78,12 +88,17 @@ uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
 if uploaded_file is not None:
     try:
         data = pd.read_csv(uploaded_file)
+        st.write("Original columns:", data.columns.tolist())
+        
         original_data = data.copy()
         data = process_data(data)
+        
+        st.write("Processed columns:", data.columns.tolist())
+        
         data = data.apply(handle_outliers)
         
         # Calculate median for each metric
-        medians = original_data.median()
+        medians = data.median()
 
         # Sidebar for current performance input
         st.sidebar.header("Current Performance")
@@ -91,7 +106,7 @@ if uploaded_file is not None:
         current_churn = st.sidebar.number_input("Current Churn Rate (%)", min_value=0.0, max_value=100.0, value=float(medians['Churn Rate (%)']))
 
         # Main content area
-        tab1, tab2 = st.tabs(["FCR and Churn Predictor", "Industry Trends"])
+        tab1, tab2 = st.tabs(["FCR and Churn Predictor", "Dataset Trends"])
 
         with tab1:
             st.subheader("Performance Comparison")
@@ -175,8 +190,11 @@ if uploaded_file is not None:
             st.subheader("Dataset Trends")
             st.write("This section could include more detailed analysis of trends based on the uploaded data.")
 
+    except ValueError as ve:
+        st.error(f"Error in data processing: {str(ve)}")
+        st.write("Please ensure your CSV file contains the required numeric columns, including 'First Call Resolution (FCR %)' and 'Churn Rate (%)'.")
     except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
+        st.error(f"An unexpected error occurred: {str(e)}")
         st.write("Please check your CSV file and try again. Ensure all relevant columns contain numeric data.")
 
 # Run the Streamlit app
