@@ -3,9 +3,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.inspection import partial_dependence
-from scipy import stats
 
 # Define theme colors and page config
 st.set_page_config(
@@ -25,67 +22,35 @@ def process_data(data):
         data = data.drop(columns=['Industry'])
     return data
 
-# Function to normalize data using Median Absolute Deviation (MAD)
-def mad_normalize(data):
-    median = data.median()
-    mad = np.median(np.abs(data - median))
-    return (data - median) / (1.4826 * mad)
-
-# Function to get feature importance using Random Forest
-def get_feature_importance(X, y):
-    rf = RandomForestRegressor(n_estimators=100, random_state=42)
-    rf.fit(X, y)
-    return pd.Series(rf.feature_importances_, index=X.columns)
-
-# Function to get partial dependence
-def get_partial_dependence(model, X, feature):
-    pd_result = partial_dependence(model, X, [feature], kind="average")
-    return pd_result['average'][0], pd_result['values'][0]
-
 # Function to calculate improvements
 def calculate_improvements(data, target, desired_improvement):
-    X = data.drop(columns=[target])
-    y = data[target]
-    
-    X_norm = mad_normalize(X)
-    importance = get_feature_importance(X_norm, y)
-    
-    rf_model = RandomForestRegressor(n_estimators=100, random_state=42).fit(X_norm, y)
+    correlations = data.corr(method='spearman')[target].drop(target)
     
     improvements = {
         "Metric": [],
         "Current Value": [],
         "Suggested Change": [],
         "New Value": [],
-        "Importance": [],
+        "Correlation": [],
         "Units": []
     }
     
-    for feature in X.columns:
-        pd_value, pd_axis = get_partial_dependence(rf_model, X_norm, feature)
-        direction = 1 if pd_value[-1] > pd_value[0] else -1
-        current_value = X[feature].median()
-        change = direction * importance[feature] * desired_improvement * current_value
-        new_value = current_value + change
-        
-        units = "sec" if "Time" in feature or "ASA" in feature or "ACW" in feature or "AWT" in feature else ("%" if "%" in feature else "min")
-        
-        improvements["Metric"].append(feature)
-        improvements["Current Value"].append(f"{current_value:.2f}")
-        improvements["Suggested Change"].append(f"{change:+.2f}")
-        improvements["New Value"].append(f"{new_value:.2f}")
-        improvements["Importance"].append(f"{importance[feature]:.4f}")
-        improvements["Units"].append(units)
+    for feature, correlation in correlations.items():
+        if abs(correlation) > 0.1:  # Only consider correlations stronger than 0.1
+            current_value = data[feature].median()
+            change = correlation * desired_improvement * current_value / 100
+            new_value = current_value + change
+            
+            units = "sec" if "Time" in feature or "ASA" in feature or "ACW" in feature or "AWT" in feature else ("%" if "%" in feature else "min")
+            
+            improvements["Metric"].append(feature)
+            improvements["Current Value"].append(f"{current_value:.2f}")
+            improvements["Suggested Change"].append(f"{change:+.2f}")
+            improvements["New Value"].append(f"{new_value:.2f}")
+            improvements["Correlation"].append(f"{correlation:.4f}")
+            improvements["Units"].append(units)
     
-    return pd.DataFrame(improvements).sort_values("Importance", ascending=False)
-
-# Function to bootstrap improvements
-def bootstrap_improvements(data, target, desired_improvement, n_iterations=1000):
-    results = []
-    for _ in range(n_iterations):
-        bootstrap_sample = data.sample(n=len(data), replace=True)
-        results.append(calculate_improvements(bootstrap_sample, target, desired_improvement))
-    return pd.concat(results)
+    return pd.DataFrame(improvements).sort_values("Correlation", key=abs, ascending=False)
 
 # Streamlit app
 st.title("Call Center FCR and Churn Predictor")
@@ -96,9 +61,8 @@ if uploaded_file:
     data = pd.read_csv(uploaded_file)
     data = process_data(data)
 
-    # Calculate median and MAD for each metric
+    # Calculate median for each metric
     medians = data.median()
-    mads = data.apply(lambda x: np.median(np.abs(x - np.median(x))))
 
     # Calculate correlation matrix
     correlation_matrix = data.corr(method='spearman')
@@ -130,36 +94,35 @@ if uploaded_file:
 
         # Calculate and display improvements
         if st.button("Calculate Improvements"):
-            with st.spinner("Calculating improvements... This may take a moment."):
-                st.subheader(f"Suggested Changes for {desired_fcr_improvement}% FCR Improvement")
-                fcr_improvement_df = calculate_improvements(data, 'First Call Resolution (FCR %)', desired_fcr_improvement)
-                if not fcr_improvement_df.empty:
-                    st.table(fcr_improvement_df)
-                else:
-                    st.write("No significant changes suggested for FCR improvement.")
-                
-                st.subheader(f"Suggested Changes for {desired_churn_improvement}% Churn Reduction")
-                churn_improvement_df = calculate_improvements(data, 'Churn Rate (%)', -desired_churn_improvement)  # Negative because we want to reduce churn
-                if not churn_improvement_df.empty:
-                    st.table(churn_improvement_df)
-                else:
-                    st.write("No significant changes suggested for Churn reduction.")
+            st.subheader(f"Suggested Changes for {desired_fcr_improvement}% FCR Improvement")
+            fcr_improvement_df = calculate_improvements(data, 'First Call Resolution (FCR %)', desired_fcr_improvement)
+            if not fcr_improvement_df.empty:
+                st.table(fcr_improvement_df)
+            else:
+                st.write("No significant changes suggested for FCR improvement.")
+            
+            st.subheader(f"Suggested Changes for {desired_churn_improvement}% Churn Reduction")
+            churn_improvement_df = calculate_improvements(data, 'Churn Rate (%)', -desired_churn_improvement)  # Negative because we want to reduce churn
+            if not churn_improvement_df.empty:
+                st.table(churn_improvement_df)
+            else:
+                st.write("No significant changes suggested for Churn reduction.")
 
             # Explanations
             if not fcr_improvement_df.empty or not churn_improvement_df.empty:
                 st.subheader("Improvement Explanations")
                 for _, row in fcr_improvement_df.iterrows():
-                    metric, change, units, importance = row['Metric'], float(row['Suggested Change']), row['Units'], float(row['Importance'])
+                    metric, change, units, correlation = row['Metric'], float(row['Suggested Change']), row['Units'], float(row['Correlation'])
                     direction = "increase" if change > 0 else "decrease"
-                    st.write(f"- To improve FCR, consider {direction}ing {metric} by {abs(change):.2f} {units}. (Importance: {importance:.4f})")
+                    st.write(f"- To improve FCR, consider {direction}ing {metric} by {abs(change):.2f} {units}. (Correlation: {correlation:.4f})")
                 
                 for _, row in churn_improvement_df.iterrows():
-                    metric, change, units, importance = row['Metric'], float(row['Suggested Change']), row['Units'], float(row['Importance'])
+                    metric, change, units, correlation = row['Metric'], float(row['Suggested Change']), row['Units'], float(row['Correlation'])
                     direction = "increase" if change > 0 else "decrease"
-                    st.write(f"- To reduce Churn, consider {direction}ing {metric} by {abs(change):.2f} {units}. (Importance: {importance:.4f})")
+                    st.write(f"- To reduce Churn, consider {direction}ing {metric} by {abs(change):.2f} {units}. (Correlation: {correlation:.4f})")
 
             # Fine print explanation
-            st.caption("These suggestions are based on Random Forest feature importance and partial dependence. The 'Importance' score indicates the relative impact of each metric. Use these as general guidance and consider the practical implications of each change in your specific context.")
+            st.caption("These suggestions are based on Spearman correlations between metrics and FCR/Churn rates. The 'Correlation' score indicates the strength and direction of the relationship. Use these as general guidance and consider the practical implications of each change in your specific context.")
 
         # Visualizations in a collapsible section
         with st.expander("Visualizations"):
