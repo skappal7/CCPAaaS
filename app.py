@@ -28,11 +28,14 @@ st.write("Predict and optimize your First Call Resolution (FCR) and Churn rates 
 data_url = 'https://raw.githubusercontent.com/skappal7/CCPAaaS/main/Call%20Center%20Data%202022%20-%202024.csv'
 data = pd.read_csv(data_url)
 
+# Remove unnecessary columns
+data = data.drop(columns=['Year', 'FCR%', 'Churn%'])
+
 # Preprocess data to calculate industry averages and standard deviations
 industry_stats = data.groupby('Industry').agg(['mean', 'std']).reset_index()
 
 # Identify common columns across all industries
-common_columns = list(set(industry_stats.columns.get_level_values(0)) - {'Industry', 'FCR%', 'Churn%'})
+common_columns = list(set(industry_stats.columns.get_level_values(0)) - {'Industry'})
 
 # Sidebar for user inputs
 st.sidebar.title("Input Metrics")
