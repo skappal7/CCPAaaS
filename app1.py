@@ -124,13 +124,15 @@ if uploaded_file:
                 "Units": []
             }
             for metric in inputs.keys():
-                required_change = desired_improvement / correlation_matrix[target][metric]
-                direction = "Increase" if correlation_matrix[target][metric] < 0 else "Decrease"
-                units = "sec" if "Time" in metric or "ASA" in metric or "ACW" in metric or "AWT" in metric else ("%" if "%" in metric else "min")
-                improvements["Metric"].append(metric)
-                improvements["Required Improvement"].append(f"{abs(required_change):.2f}")
-                improvements["Change Direction"].append(direction)
-                improvements["Units"].append(units)
+                correlation = correlation_matrix[target][metric]
+                if correlation != 0:
+                    required_change = desired_improvement / correlation
+                    direction = "Increase" if correlation < 0 else "Decrease"
+                    units = "sec" if "Time" in metric or "ASA" in metric or "ACW" in metric or "AWT" in metric else ("%" if "%" in metric else "min")
+                    improvements["Metric"].append(metric)
+                    improvements["Required Improvement"].append(f"{abs(required_change):.2f}")
+                    improvements["Change Direction"].append(direction)
+                    improvements["Units"].append(units)
             
             return pd.DataFrame(improvements)
 
@@ -200,4 +202,24 @@ if uploaded_file:
             st.pyplot(fig)
 
     with tab2:
-        st.sub
+        st.subheader("Industry Trends")
+        st.write("Analyze the uploaded data to make sense of the industry trends.")
+        st.dataframe(data)
+
+    # Tech stack badges
+    st.markdown(
+        """
+        <div style='display: flex; justify-content: center;'>
+            <img src='https://img.shields.io/badge/Python-3.8-blue' style='margin: 5px;'>
+            <img src='https://img.shields.io/badge/Pandas-1.3.3-green' style='margin: 5px;'>
+            <img src='https://img.shields.io/badge/Streamlit-0.89.0-red' style='margin: 5px;'>
+            <img src='https://img.shields.io/badge/Matplotlib-3.4.3-orange' style='margin: 5px;'>
+            <img src='https://img.shields.io/badge/Seaborn-0.11.2-yellow' style='margin: 5px;'>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+else:
+    st.info("Please upload a CSV file to proceed.")
+
+       
