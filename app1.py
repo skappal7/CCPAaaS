@@ -1,10 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import statsmodels.api as sm
-from matplotlib.ticker import FixedLocator
 
 # Function to process data
 def process_data(data):
@@ -80,6 +77,10 @@ if uploaded_file is not None:
         # Calculate median for each metric
         medians = data.median()
 
+        # Calculate correlations with FCR and Churn
+        correlation_fcr = data.corr()['First Call Resolution (FCR %)'].sort_values(ascending=False)
+        correlation_churn = data.corr()['Churn Rate (%)'].sort_values(ascending=False)
+
         # Main content area
         tab1, tab2 = st.tabs(["FCR and Churn Predictor", "Industry Trends"])
 
@@ -118,38 +119,15 @@ if uploaded_file is not None:
                     st.write(f"The 95% confidence interval for {target_variable} is ({np.percentile(simulations, 2.5):.2f}%, {np.percentile(simulations, 97.5):.2f}%).")
                     st.write("These results provide a range of potential outcomes based on the simulated scenarios. Use this information to guide decisions on performance improvements.")
 
-            # Visualizations in a collapsible section
-            with st.expander("Visualizations"):
-                st.subheader("Correlation Heatmap")
-                correlation_matrix = data.corr()
-                plt.figure(figsize=(10, 8))
-                sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt='.2f')
-                plt.title("Correlation Heatmap", fontsize=12, fontweight='bold')
-                plt.xticks(fontsize=9)
-                plt.yticks(fontsize=9)
-                st.pyplot(plt)
-
-                st.subheader("Key Metrics vs FCR and Churn")
-                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-                
-                # Plot for FCR
-                top_fcr_corr = correlation_matrix['First Call Resolution (FCR %)'].sort_values(key=abs, ascending=False)[1:6]
-                ax1.set_xticks(range(len(top_fcr_corr.index)))
-                ax1.set_xticklabels(top_fcr_corr.index, rotation=45, ha='right')
-                sns.barplot(x=top_fcr_corr.index, y=top_fcr_corr.values, ax=ax1)
-                ax1.set_title("Top 5 Correlations with FCR", fontsize=10, fontweight='bold')
-                ax1.tick_params(labelsize=9)
-                
-                # Plot for Churn
-                top_churn_corr = correlation_matrix['Churn Rate (%)'].sort_values(key=abs, ascending=False)[1:6]
-                ax2.set_xticks(range(len(top_churn_corr.index)))
-                ax2.set_xticklabels(top_churn_corr.index, rotation=45, ha='right')
-                sns.barplot(x=top_churn_corr.index, y=top_churn_corr.values, ax=ax2)
-                ax2.set_title("Top 5 Correlations with Churn Rate", fontsize=10, fontweight='bold')
-                ax2.tick_params(labelsize=9)
-                
-                plt.tight_layout()
-                st.pyplot(fig)
+            # Correlation tables
+            st.subheader("Correlations with FCR and Churn")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("Top 5 Correlations with FCR")
+                st.dataframe(correlation_fcr.head(6).drop(labels=['First Call Resolution (FCR %)']).to_frame('Correlation'))
+            with col2:
+                st.write("Top 5 Correlations with Churn Rate")
+                st.dataframe(correlation_churn.head(6).drop(labels=['Churn Rate (%)']).to_frame('Correlation'))
 
         with tab2:
             st.subheader("Industry Trends")
