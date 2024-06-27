@@ -32,7 +32,7 @@ data = pd.read_csv(data_url)
 industry_stats = data.groupby('Industry').agg(['mean', 'std']).reset_index()
 
 # Identify common columns across all industries
-common_columns = list(set(industry_stats.columns.get_level_values(0)) - {'Industry'})
+common_columns = list(set(industry_stats.columns.get_level_values(0)) - {'Industry', 'FCR%', 'Churn%'})
 
 # Sidebar for user inputs
 st.sidebar.title("Input Metrics")
@@ -82,7 +82,6 @@ else:
         'ASA (sec)': 0.1,
         'ACW (sec)': 0.05,
         'Sentiment Score': 0.1,
-        'CSAT (%)': 0.1,
         'Average Waiting Time (AWT sec)': 0.05,
         'Average Handle Time (AHT min)': 0.05,
         'Call Transfer Rate (%)': 0.1
