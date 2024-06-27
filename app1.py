@@ -72,7 +72,7 @@ def process_data(data):
     if 'Year' in data.columns:
         data = data.drop(columns=['Year'])
     if 'Industry' in data.columns:
-        data = data.drop(columns(['Industry']))
+        data = data.drop(columns=['Industry'])
     
     return data
 
@@ -193,3 +193,11 @@ if uploaded_file:
             st.subheader("Relationships between Metrics")
             selected_metric = st.selectbox("Select Metric to Compare with FCR and Churn", data.columns.drop(['First Call Resolution (FCR %)', 'Churn Rate (%)']))
             fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+            sns.scatterplot(data=data, x=selected_metric, y='First Call Resolution (FCR %)', ax=ax[0])
+            ax[0].set_title(f'{selected_metric} vs FCR')
+            sns.scatterplot(data=data, x=selected_metric, y='Churn Rate (%)', ax=ax[1])
+            ax[1].set_title(f'{selected_metric} vs Churn')
+            st.pyplot(fig)
+
+    with tab2:
+        st.sub
