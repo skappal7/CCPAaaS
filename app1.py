@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import statsmodels.api as sm
 
 # Function to process data
 def process_data(data):
@@ -13,37 +12,33 @@ def process_data(data):
     data = data[numeric_columns]
     return data
 
-# Function to perform logistic regression
-def logistic_regression(data, target):
-    X = data.drop(columns=[target])
-    X = sm.add_constant(X)
-    y = (data[target] > data[target].median()).astype(int)  # Convert target to binary based on median
-    model = sm.Logit(y, X).fit()
-    return model
+# Function to run Monte Carlo simulations
+def monte_carlo_simulation(data, target, num_simulations=10000):
+    simulations = []
+    for _ in range(num_simulations):
+        simulated_data = data.copy()
+        for column in data.columns:
+            if column != target:
+                change = np.random.normal(loc=0, scale=0.1 * data[column].std(), size=data.shape[0])
+                simulated_data[column] += change
+        if target == 'First Call Resolution (FCR %)':
+            model = sm.OLS(simulated_data[target], sm.add_constant(simulated_data.drop(columns=[target]))).fit()
+            predictions = model.predict(sm.add_constant(simulated_data.drop(columns=[target])))
+        elif target == 'Churn Rate (%)':
+            model = sm.Logit((simulated_data[target] > simulated_data[target].median()).astype(int), 
+                              sm.add_constant(simulated_data.drop(columns=[target]))).fit()
+            predictions = model.predict(sm.add_constant(simulated_data.drop(columns=[target])))
+        simulations.append(predictions.median())
+    return simulations
 
-# Function to perform linear regression
-def linear_regression(data, target):
-    X = data.drop(columns=[target])
-    X = sm.add_constant(X)
-    y = data[target]
-    model = sm.OLS(y, X).fit()
-    return model
-
-# Rule-Based Recommendations
-def rule_based_recommendations(target):
-    if target == 'First Call Resolution (FCR %)':
-        return [
-            {'metric': 'Average Handling Time (AHT)', 'suggestion': 'Reduce by 10%'},
-            {'metric': 'After Call Work (ACW)', 'suggestion': 'Reduce by 5%'},
-            {'metric': 'Average Speed of Answer (ASA)', 'suggestion': 'Reduce by 5 seconds'}
-        ]
-    elif target == 'Churn Rate (%)':
-        return [
-            {'metric': 'Customer Satisfaction (CSAT)', 'suggestion': 'Increase by 5%'},
-            {'metric': 'Average Speed of Answer (ASA)', 'suggestion': 'Reduce by 3 seconds'},
-            {'metric': 'After Call Work (ACW)', 'suggestion': 'Reduce by 5%'}
-        ]
-    return []
+# Function to visualize Monte Carlo results
+def visualize_monte_carlo(simulations, target):
+    plt.figure(figsize=(10, 6))
+    sns.histplot(simulations, kde=True, bins=50)
+    plt.title(f'Monte Carlo Simulation Results for {target}')
+    plt.xlabel(f'{target} (%)')
+    plt.ylabel('Frequency')
+    st.pyplot(plt)
 
 # Streamlit app
 st.set_page_config(page_title="Call Center FCR and Churn Predictor", page_icon=":phone:", layout="wide")
@@ -75,58 +70,22 @@ if uploaded_file is not None:
             with col2:
                 st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{current_churn - medians['Churn Rate (%)']:.2f}%")
 
-            # Logistic Regression for Churn Prediction
-            st.subheader("Logistic Regression for Churn Prediction")
-            target_churn = 'Churn Rate (%)'
-            logit_model = logistic_regression(data, target_churn)
-            st.write("Logistic Regression Model Summary:")
-            st.write(logit_model.summary())
-
-            # Linear Regression for FCR Prediction
-            st.subheader("Linear Regression for FCR Prediction")
-            target_fcr = 'First Call Resolution (FCR %)'
-            linreg_model = linear_regression(data, target_fcr)
-            st.write("Linear Regression Model Summary:")
-            st.write(linreg_model.summary())
-
-            # Rule-Based Recommendations
-            st.subheader("Rule-Based Recommendations")
-            selected_target = st.selectbox("Select Target Variable", options=["First Call Resolution (FCR %)", "Churn Rate (%)"])
-            recommendations = rule_based_recommendations(selected_target)
-            st.write("Recommendations:")
-            for rec in recommendations:
-                st.write(f"{rec['metric']}: {rec['suggestion']}")
-
-            # Simplified Simulation
-            st.subheader("Simplified Simulation")
-            st.write("Adjust the metrics to see the projected impact on FCR and Churn Rate:")
-
-            aht_change = st.slider("Change in AHT (sec)", min_value=-100, max_value=100, value=0, step=5)
-            acw_change = st.slider("Change in ACW (sec)", min_value=-20, max_value=20, value=0, step=1)
-            asa_change = st.slider("Change in ASA (sec)", min_value=-10, max_value=10, value=0, step=1)
-            csat_change = st.slider("Change in CSAT (%)", min_value=-10, max_value=10, value=0, step=1)
-
-            changes = {
-                'Average Handling Time (AHT)': aht_change,
-                'After Call Work (ACW)': acw_change,
-                'Average Speed of Answer (ASA)': asa_change,
-                'Customer Satisfaction (CSAT)': csat_change
-            }
-
-            if st.button("Simulate Impact"):
-                with st.spinner("Simulating impact..."):
-                    # Apply changes to data
-                    simulated_data = data.copy()
-                    for feature, change in changes.items():
-                        if feature in simulated_data.columns:
-                            simulated_data[feature] += change
+            # Monte Carlo Simulation for FCR and Churn Prediction
+            st.subheader("Monte Carlo Simulation")
+            target_variable = st.selectbox("Select Target Variable for Simulation", options=["First Call Resolution (FCR %)", "Churn Rate (%)"])
+            num_simulations = st.slider("Number of Simulations", min_value=1000, max_value=20000, value=10000, step=1000)
+            
+            if st.button("Run Monte Carlo Simulation"):
+                with st.spinner("Running Monte Carlo simulations..."):
+                    simulations = monte_carlo_simulation(data, target_variable, num_simulations)
+                    visualize_monte_carlo(simulations, target_variable)
                     
-                    # Predict new FCR and Churn values
-                    simulated_fcr = linreg_model.predict(sm.add_constant(simulated_data.drop(columns=[target_fcr]))).mean()
-                    simulated_churn = logit_model.predict(sm.add_constant(simulated_data.drop(columns=[target_churn]))).mean()
-
-                    st.metric("Simulated FCR", f"{simulated_fcr:.2f}%")
-                    st.metric("Simulated Churn Rate", f"{simulated_churn:.2f}%")
+                    # Provide summary and insights
+                    st.subheader("Simulation Summary and Insights")
+                    st.write(f"The average simulated {target_variable} is {np.mean(simulations):.2f}%.")
+                    st.write(f"The median simulated {target_variable} is {np.median(simulations):.2f}%.")
+                    st.write(f"The 95% confidence interval for {target_variable} is ({np.percentile(simulations, 2.5):.2f}%, {np.percentile(simulations, 97.5):.2f}%).")
+                    st.write("These results provide a range of potential outcomes based on the simulated scenarios. Use this information to guide decisions on performance improvements.")
 
             # Visualizations in a collapsible section
             with st.expander("Visualizations"):
