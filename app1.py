@@ -67,8 +67,8 @@ csat_change = st.sidebar.slider("Change in CSAT (%)", min_value=-10, max_value=1
 
 # Sidebar for current performance input
 st.sidebar.header("Current Performance")
-current_fcr = st.sidebar.number_input("Current FCR (%)", min_value=0.0, max_value=100.0, value=benchmark_fcr)
-current_churn = st.sidebar.number_input("Current Churn Rate (%)", min_value=0.0, max_value=100.0, value=benchmark_churn)
+current_fcr = st.sidebar.number_input("Current FCR (%)", min_value=0.0, max_value=100.0, value=float(benchmark_fcr))
+current_churn = st.sidebar.number_input("Current Churn Rate (%)", min_value=0.0, max_value=100.0, value=float(benchmark_churn))
 
 uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
 if uploaded_file is not None:
@@ -141,14 +141,14 @@ if uploaded_file is not None:
                 top_fcr_corr = correlation_matrix['First Call Resolution (FCR %)'].sort_values(key=abs, ascending=False)[1:6]
                 sns.barplot(x=top_fcr_corr.index, y=top_fcr_corr.values, ax=ax1)
                 ax1.set_title("Top 5 Correlations with FCR", fontsize=10, fontweight='bold')
-                ax1.set_xticklabels(ax1.get_xticks(), rotation=45, ha='right')
+                ax1.set_xticklabels(ax1.get_xticklabels(), rotation=45, ha='right')
                 ax1.tick_params(labelsize=9)
                 
                 # Plot for Churn
                 top_churn_corr = correlation_matrix['Churn Rate (%)'].sort_values(key=abs, ascending=False)[1:6]
                 sns.barplot(x=top_churn_corr.index, y=top_churn_corr.values, ax=ax2)
                 ax2.set_title("Top 5 Correlations with Churn Rate", fontsize=10, fontweight='bold')
-                ax2.set_xticklabels(ax2.get_xticks(), rotation=45, ha='right')
+                ax2.set_xticklabels(ax2.get_xticklabels(), rotation=45, ha='right')
                 ax2.tick_params(labelsize=9)
                 
                 plt.tight_layout()
