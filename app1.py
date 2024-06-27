@@ -11,8 +11,65 @@ st.set_page_config(
     layout="wide"
 )
 
-# Apply custom CSS for theming (same as before, omitted for brevity)
-st.markdown("...", unsafe_allow_html=True)
+# Apply custom CSS for theming
+st.markdown(
+    """
+    <style>
+    body {
+        background-color: #f4f4f9;
+        font-family: "Poppins", sans-serif;
+    }
+    .css-1d391kg {
+        background-color: #00a6d6;
+    }
+    .css-1cpxqw2 {
+        color: #333333;
+    }
+    .css-145kmo2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #06516F;
+    }
+    .css-1vbd788 {
+        font-size: 1.2rem;
+        font-weight: 500;
+        color: #06516F;
+    }
+    .stButton>button {
+        background-color: #06516F;
+        color: #ffffff;
+        border: none;
+        border-radius: 4px;
+        font-size: 1rem;
+        padding: 10px 20px;
+    }
+    .stButton>button:hover {
+        background-color: #0098DB;
+        color: #ffffff;
+    }
+    .css-1n4pd67 {
+        background-color: #f4f4f9;
+        border: 1px solid #06516F;
+    }
+    .css-1v0mbdj {
+        width: 80% !important;
+    }
+    .css-1pjc44v {
+        font-size: 9pt;
+        font-family: "Poppins", sans-serif;
+    }
+    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4, .stMarkdown h5, .stMarkdown h6 {
+        font-family: "Poppins", sans-serif;
+    }
+    /* Custom styles for visualizations */
+    .matplotlib-figure {
+        font-family: "Poppins", sans-serif;
+        font-size: 9pt;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # Function to process data
 def process_data(data):
@@ -23,10 +80,10 @@ def process_data(data):
     return data
 
 # Function to calculate realistic improvements
-def calculate_realistic_improvement(metric, target, correlation, desired_improvement):
+def calculate_realistic_improvement(metric, target, correlation, desired_improvement, current_value):
     max_change_percent = 0.1  # Maximum 10% change for any metric
     base_change = desired_improvement * abs(correlation)
-    capped_change = min(base_change, max_change_percent * metric)
+    capped_change = min(base_change, max_change_percent * abs(current_value))
     
     if (target == 'FCR' and correlation > 0) or (target == 'Churn' and correlation < 0):
         return capped_change
@@ -59,6 +116,37 @@ if uploaded_file:
     for column in data.columns.drop(['First Call Resolution (FCR %)', 'Churn Rate (%)']):
         inputs[column] = st.sidebar.slider(f"{column}", min_value=float(data[column].min()), max_value=float(data[column].max()), value=float(means[column]), key=column)
 
+    # Function to calculate required metric improvements
+    def improvement_for_target(target, desired_improvement, inputs):
+        improvements = {
+            "Metric": [],
+            "Current Value": [],
+            "Suggested Change": [],
+            "New Value": [],
+            "Units": []
+        }
+        for metric in inputs.keys():
+            correlation = correlation_matrix[target][metric]
+            if abs(correlation) > 0.05:  # Lowered threshold to include more metrics
+                current_value = inputs[metric]
+                required_change = calculate_realistic_improvement(
+                    current_value, 
+                    'FCR' if target == 'First Call Resolution (FCR %)' else 'Churn', 
+                    correlation, 
+                    desired_improvement,
+                    current_value
+                )
+                units = "sec" if "Time" in metric or "ASA" in metric or "ACW" in metric or "AWT" in metric else ("%" if "%" in metric else "min")
+                new_value = current_value + required_change
+                
+                improvements["Metric"].append(metric)
+                improvements["Current Value"].append(f"{current_value:.2f}")
+                improvements["Suggested Change"].append(f"{required_change:+.2f}")
+                improvements["New Value"].append(f"{new_value:.2f}")
+                improvements["Units"].append(units)
+        
+        return pd.DataFrame(improvements)
+
     # Main content area
     tab1, tab2 = st.tabs(["FCR and Churn Predictor", "Industry Trends"])
 
@@ -79,45 +167,34 @@ if uploaded_file:
         with col2:
             desired_churn_improvement = st.number_input("Desired Reduction in Churn (%)", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
 
-        # Function to calculate required metric improvements
-        def improvement_for_target(target, desired_improvement):
-            improvements = {
-                "Metric": [],
-                "Required Change": [],
-                "Units": []
-            }
-            for metric in inputs.keys():
-                correlation = correlation_matrix[target][metric]
-                if abs(correlation) > 0.1:  # Only suggest changes for metrics with significant correlation
-                    required_change = calculate_realistic_improvement(inputs[metric], 'FCR' if target == 'First Call Resolution (FCR %)' else 'Churn', correlation, desired_improvement)
-                    units = "sec" if "Time" in metric or "ASA" in metric or "ACW" in metric or "AWT" in metric else ("%" if "%" in metric else "min")
-                    improvements["Metric"].append(metric)
-                    improvements["Required Change"].append(f"{required_change:.2f}")
-                    improvements["Units"].append(units)
-            
-            return pd.DataFrame(improvements)
-
         # Calculate and display improvements
         if st.button("Calculate Improvements"):
             st.subheader(f"Suggested Changes for {desired_fcr_improvement}% FCR Improvement")
-            fcr_improvement_df = improvement_for_target('First Call Resolution (FCR %)', desired_fcr_improvement)
-            st.table(fcr_improvement_df)
+            fcr_improvement_df = improvement_for_target('First Call Resolution (FCR %)', desired_fcr_improvement, inputs)
+            if not fcr_improvement_df.empty:
+                st.table(fcr_improvement_df)
+            else:
+                st.write("No significant changes suggested for FCR improvement.")
             
             st.subheader(f"Suggested Changes for {desired_churn_improvement}% Churn Reduction")
-            churn_improvement_df = improvement_for_target('Churn Rate (%)', desired_churn_improvement)
-            st.table(churn_improvement_df)
+            churn_improvement_df = improvement_for_target('Churn Rate (%)', desired_churn_improvement, inputs)
+            if not churn_improvement_df.empty:
+                st.table(churn_improvement_df)
+            else:
+                st.write("No significant changes suggested for Churn reduction.")
 
             # Explanations
-            st.subheader("Improvement Explanations")
-            for _, row in fcr_improvement_df.iterrows():
-                metric, change, units = row['Metric'], float(row['Required Change']), row['Units']
-                direction = "increase" if change > 0 else "decrease"
-                st.write(f"- To improve FCR, consider {direction}ing {metric} by {abs(change):.2f} {units}.")
-            
-            for _, row in churn_improvement_df.iterrows():
-                metric, change, units = row['Metric'], float(row['Required Change']), row['Units']
-                direction = "increase" if change > 0 else "decrease"
-                st.write(f"- To reduce Churn, consider {direction}ing {metric} by {abs(change):.2f} {units}.")
+            if not fcr_improvement_df.empty or not churn_improvement_df.empty:
+                st.subheader("Improvement Explanations")
+                for _, row in fcr_improvement_df.iterrows():
+                    metric, change, units = row['Metric'], float(row['Suggested Change']), row['Units']
+                    direction = "increase" if change > 0 else "decrease"
+                    st.write(f"- To improve FCR, consider {direction}ing {metric} by {abs(change):.2f} {units}.")
+                
+                for _, row in churn_improvement_df.iterrows():
+                    metric, change, units = row['Metric'], float(row['Suggested Change']), row['Units']
+                    direction = "increase" if change > 0 else "decrease"
+                    st.write(f"- To reduce Churn, consider {direction}ing {metric} by {abs(change):.2f} {units}.")
 
             # Fine print explanation
             st.caption("These suggestions are based on the correlations between metrics and FCR/Churn rates in your data. The actual impact may vary due to complex relationships between variables. Use these as general guidance and consider the practical implications of each change in your specific context.")
