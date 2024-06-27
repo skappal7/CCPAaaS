@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import statsmodels.api as sm
+from matplotlib.ticker import FixedLocator
 
 # Function to process data
 def process_data(data):
@@ -60,9 +61,9 @@ industry = st.sidebar.selectbox("Select Industry", options=list(industry_benchma
 benchmark_fcr = industry_benchmarks[industry]['FCR']
 benchmark_churn = industry_benchmarks[industry]['Churn']
 
-aht_change = st.sidebar.slider("Change in AHT (sec)", min_value=-100, max_value=100, value=0, step=5)
-acw_change = st.sidebar.slider("Change in ACW (sec)", min_value=-20, max_value=20, value=0, step=1)
-asa_change = st.sidebar.slider("Change in ASA (sec)", min_value=-10, max_value=10, value=0, step=1)
+aht_change = st.sidebar.slider("Change in AHT (min)", min_value=-100, max_value=100, value=0, step=5)
+acw_change = st.sidebar.slider("Change in ACW (min)", min_value=-20, max_value=20, value=0, step=1)
+asa_change = st.sidebar.slider("Change in ASA (min)", min_value=-10, max_value=10, value=0, step=1)
 csat_change = st.sidebar.slider("Change in CSAT (%)", min_value=-10, max_value=10, value=0, step=1)
 
 # Sidebar for current performance input
@@ -78,12 +79,6 @@ if uploaded_file is not None:
         
         # Calculate median for each metric
         medians = data.median()
-
-        # Display industry benchmarks
-        st.subheader("Industry Benchmarks")
-        st.write(f"Selected Industry: {industry}")
-        st.write(f"Industry Median FCR: {benchmark_fcr}%")
-        st.write(f"Industry Median Churn: {benchmark_churn}%")
 
         # Main content area
         tab1, tab2 = st.tabs(["FCR and Churn Predictor", "Industry Trends"])
@@ -139,16 +134,18 @@ if uploaded_file is not None:
                 
                 # Plot for FCR
                 top_fcr_corr = correlation_matrix['First Call Resolution (FCR %)'].sort_values(key=abs, ascending=False)[1:6]
+                ax1.set_xticks(range(len(top_fcr_corr.index)))
+                ax1.set_xticklabels(top_fcr_corr.index, rotation=45, ha='right')
                 sns.barplot(x=top_fcr_corr.index, y=top_fcr_corr.values, ax=ax1)
                 ax1.set_title("Top 5 Correlations with FCR", fontsize=10, fontweight='bold')
-                ax1.set_xticklabels(ax1.get_xticklabels(), rotation=45, ha='right')
                 ax1.tick_params(labelsize=9)
                 
                 # Plot for Churn
                 top_churn_corr = correlation_matrix['Churn Rate (%)'].sort_values(key=abs, ascending=False)[1:6]
+                ax2.set_xticks(range(len(top_churn_corr.index)))
+                ax2.set_xticklabels(top_churn_corr.index, rotation=45, ha='right')
                 sns.barplot(x=top_churn_corr.index, y=top_churn_corr.values, ax=ax2)
                 ax2.set_title("Top 5 Correlations with Churn Rate", fontsize=10, fontweight='bold')
-                ax2.set_xticklabels(ax2.get_xticklabels(), rotation=45, ha='right')
                 ax2.tick_params(labelsize=9)
                 
                 plt.tight_layout()
