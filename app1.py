@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy import stats
 
 # Function to process and normalize data
 def process_data(data):
@@ -20,7 +19,9 @@ def process_data(data):
 
 # Function to handle outliers
 def handle_outliers(data, lower_percentile=1, upper_percentile=99):
-    return data.clip(lower=data.quantile(lower_percentile/100), upper=data.quantile(upper_percentile/100))
+    lower = np.percentile(data, lower_percentile)
+    upper = np.percentile(data, upper_percentile)
+    return np.clip(data, lower, upper)
 
 # Custom weighted feature importance
 def custom_feature_importance(X, y, n_iterations=100, sample_size=0.8):
@@ -83,7 +84,7 @@ if uploaded_file is not None:
         data = pd.read_csv(uploaded_file)
         original_data = data.copy()
         data = process_data(data)
-        data = handle_outliers(data)
+        data = data.apply(handle_outliers)
         
         # Calculate median for each metric
         medians = original_data.median()
