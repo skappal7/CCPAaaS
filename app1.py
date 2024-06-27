@@ -6,10 +6,6 @@ import seaborn as sns
 
 # Function to process and normalize data
 def process_data(data):
-    # Remove 'Year' and 'Industry' columns if they exist
-    columns_to_drop = ['Year', 'Industry']
-    data = data.drop(columns=[col for col in columns_to_drop if col in data.columns])
-    
     # Keep only numeric columns
     numeric_columns = data.select_dtypes(include=[np.number]).columns
     data = data[numeric_columns]
@@ -102,10 +98,10 @@ if uploaded_file is not None:
             col1, col2 = st.columns(2)
             with col1:
                 st.metric("Your FCR", f"{current_fcr:.2f}%", f"{current_fcr - medians['First Call Resolution (FCR %)']:.2f}%")
-                st.metric("Industry Median FCR", f"{medians['First Call Resolution (FCR %)']:.2f}%")
+                st.metric("Dataset Median FCR", f"{medians['First Call Resolution (FCR %)']:.2f}%")
             with col2:
                 st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{current_churn - medians['Churn Rate (%)']:.2f}%")
-                st.metric("Industry Median Churn Rate", f"{medians['Churn Rate (%)']:.2f}%")
+                st.metric("Dataset Median Churn Rate", f"{medians['Churn Rate (%)']:.2f}%")
 
             # User input for desired improvement percentage
             col1, col2 = st.columns(2)
@@ -176,8 +172,8 @@ if uploaded_file is not None:
                 st.pyplot(fig)
 
         with tab2:
-            st.subheader("Industry Trends")
-            st.write("This section could include more detailed analysis of industry trends based on the uploaded data.")
+            st.subheader("Dataset Trends")
+            st.write("This section could include more detailed analysis of trends based on the uploaded data.")
 
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
