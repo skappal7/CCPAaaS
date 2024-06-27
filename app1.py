@@ -125,8 +125,8 @@ if uploaded_file is not None:
                 plt.figure(figsize=(10, 8))
                 sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt='.2f')
                 plt.title("Correlation Heatmap", fontsize=12, fontweight='bold')
-                plt.xticks(fontsize=9, fontfamily='Poppins')
-                plt.yticks(fontsize=9, fontfamily='Poppins')
+                plt.xticks(fontsize=9)
+                plt.yticks(fontsize=9)
                 st.pyplot(plt)
 
                 st.subheader("Key Metrics vs FCR and Churn")
