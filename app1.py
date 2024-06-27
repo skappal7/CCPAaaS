@@ -99,15 +99,10 @@ if uploaded_file:
         for column in industry_data.columns.drop(['First Call Resolution (FCR %)', 'Churn Rate (%)']):
             inputs[column] = st.slider(f"Adjust {column}", min_value=float(industry_data[column].min()), max_value=float(industry_data[column].max()), value=float(means[column]))
 
-    # Function to calculate z-scores
-    def calculate_z_score(value, mean, std):
-        return (value - mean) / std
-
-    # Function to predict FCR and Churn based on user inputs
+    # Function to predict FCR and Churn based on weighted sum approach
     def predict_fcr_churn(inputs):
-        z_scores = [(calculate_z_score(inputs[metric], means[metric], stds[metric])) for metric in inputs.keys()]
-        fcr_pred = sum([z * correlation_matrix['First Call Resolution (FCR %)'][metric] for z, metric in zip(z_scores, inputs.keys())])
-        churn_pred = sum([z * correlation_matrix['Churn Rate (%)'][metric] for z, metric in zip(z_scores, inputs.keys())])
+        fcr_pred = np.dot([inputs[metric] for metric in inputs.keys()], [correlation_matrix['First Call Resolution (FCR %)'][metric] for metric in inputs.keys()])
+        churn_pred = np.dot([inputs[metric] for metric in inputs.keys()], [correlation_matrix['Churn Rate (%)'][metric] for metric in inputs.keys()])
         fcr_pred = np.clip(fcr_pred, 0, 100)
         churn_pred = np.clip(churn_pred, 0, 100)
         return fcr_pred, churn_pred
@@ -126,9 +121,11 @@ if uploaded_file:
             "Churn Impact (%)": []
         }
         for metric in inputs.keys():
+            fcr_impact = correlation_matrix['First Call Resolution (FCR %)'][metric]
+            churn_impact = correlation_matrix['Churn Rate (%)'][metric]
             impact_data["Metric"].append(metric)
-            impact_data["FCR Impact (%)"].append(correlation_matrix['First Call Resolution (FCR %)'][metric] * 100)
-            impact_data["Churn Impact (%)"].append(correlation_matrix['Churn Rate (%)'][metric] * 100)
+            impact_data["FCR Impact (%)"].append(fcr_impact * 100)
+            impact_data["Churn Impact (%)"].append(churn_impact * 100)
         
         impact_df = pd.DataFrame(impact_data)
         st.table(impact_df)
