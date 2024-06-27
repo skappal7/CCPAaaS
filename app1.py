@@ -5,10 +5,10 @@ import numpy as np
 # Function to process data
 def process_data(data):
     # Data preprocessing
-    if 'year' in data.columns:
-        data = data.drop(columns=['year'])
-    if 'industry' not in data.columns:
-        st.error("The uploaded data does not contain an 'industry' column.")
+    if 'Year' in data.columns:
+        data = data.drop(columns=['Year'])
+    if 'Industry' not in data.columns:
+        st.error("The uploaded data does not contain an 'Industry' column.")
         st.stop()
     
     return data
@@ -23,14 +23,14 @@ if uploaded_file:
     data = process_data(data)
 
     # Industry selection
-    industries = data['industry'].unique()
+    industries = data['Industry'].unique()
     selected_industry = st.selectbox("Select Industry", industries)
 
     # Filter data by selected industry
-    industry_data = data[data['industry'] == selected_industry]
+    industry_data = data[data['Industry'] == selected_industry]
 
     # Drop industry column for calculations
-    industry_data = industry_data.drop(columns=['industry'])
+    industry_data = industry_data.drop(columns=['Industry'])
 
     # Calculate mean and standard deviation for each metric
     means = industry_data.mean()
@@ -46,8 +46,8 @@ if uploaded_file:
     # Function to predict FCR and Churn based on user inputs
     def predict_fcr_churn(inputs):
         z_scores = [(calculate_z_score(inputs[metric], means[metric], stds[metric])) for metric in inputs.keys()]
-        fcr_pred = sum([z * correlation_matrix['FCR'][metric] for z, metric in zip(z_scores, inputs.keys())])
-        churn_pred = sum([z * correlation_matrix['Churn'][metric] for z, metric in zip(z_scores, inputs.keys())])
+        fcr_pred = sum([z * correlation_matrix['First Call Resolution (FCR %)'][metric] for z, metric in zip(z_scores, inputs.keys())])
+        churn_pred = sum([z * correlation_matrix['Churn Rate (%)'][metric] for z, metric in zip(z_scores, inputs.keys())])
         fcr_pred = np.clip(fcr_pred, 0, 100)
         churn_pred = np.clip(churn_pred, 0, 100)
         return fcr_pred, churn_pred
@@ -55,7 +55,7 @@ if uploaded_file:
     # User inputs via sliders
     inputs = {}
     st.subheader("Adjust the Metrics")
-    for column in industry_data.columns.drop(['FCR', 'Churn']):
+    for column in industry_data.columns.drop(['First Call Resolution (FCR %)', 'Churn Rate (%)']):
         inputs[column] = st.slider(f"Adjust {column}", min_value=float(industry_data[column].min()), max_value=float(industry_data[column].max()), value=float(means[column]))
 
     # Predict button
@@ -67,8 +67,8 @@ if uploaded_file:
         # Impact analysis
         st.subheader("Impact Analysis")
         for metric in inputs.keys():
-            fcr_impact = correlation_matrix['FCR'][metric]
-            churn_impact = correlation_matrix['Churn'][metric]
+            fcr_impact = correlation_matrix['First Call Resolution (FCR %)'][metric]
+            churn_impact = correlation_matrix['Churn Rate (%)'][metric]
             st.write(f"Adjusting {metric} by 1% changes FCR by {fcr_impact:.2f}% and Churn by {churn_impact:.2f}%")
 else:
     st.info("Please upload a CSV file to proceed.")
