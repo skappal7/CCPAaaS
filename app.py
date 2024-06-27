@@ -27,14 +27,10 @@ st.write("Predict and optimize your First Call Resolution (FCR) and Churn rates 
 # File uploader for data
 uploaded_file = st.file_uploader("Upload your CSV or Excel file", type=['csv', 'xlsx'])
 if uploaded_file is not None:
-    try:
-        if uploaded_file.name.endswith('.csv'):
-            data = pd.read_csv(uploaded_file)
-        else:
-            data = pd.read_excel(uploaded_file)
-    except Exception as e:
-        st.error(f"Error reading file: {e}")
-        st.stop()
+    if uploaded_file.name.endswith('.csv'):
+        data = pd.read_csv(uploaded_file)
+    else:
+        data = pd.read_excel(uploaded_file)
 
     # Preprocess data to calculate industry averages and standard deviations
     industry_stats = data.groupby('Industry').agg(['mean', 'std']).reset_index()
@@ -45,9 +41,14 @@ if uploaded_file is not None:
     
     # Function to calculate z-scores
     def calculate_z_scores(input_data, industry):
+        # Select the relevant industry statistics
         industry_mean = industry_stats[industry_stats['Industry'] == industry].xs('mean', level=1, axis=1)[common_columns]
         industry_std = industry_stats[industry_stats['Industry'] == industry].xs('std', level=1, axis=1)[common_columns]
+        
+        # Align columns
         input_data = input_data[common_columns]
+        
+        # Calculate z-scores
         z_scores = (input_data - industry_mean) / industry_std
         return z_scores
 
@@ -103,10 +104,6 @@ if uploaded_file is not None:
         predicted_fcr = np.sum(z_scores * weights_series)
         predicted_churn = np.sum(z_scores * weights_series)
 
-        # Normalize predictions to a reasonable range (e.g., 0-100%)
-        predicted_fcr = max(0, min(100, 50 + predicted_fcr * 10))
-        predicted_churn = max(0, min(100, 10 + predicted_churn * 5))
-
         # Display predictions
         st.subheader("Predicted First Call Resolution (FCR) and Churn Rates")
         st.write(f"Predicted FCR: {predicted_fcr:.2f}%")
@@ -126,32 +123,13 @@ if uploaded_file is not None:
         plt.title('Impact of Metrics on FCR and Churn Predictions')
         st.pyplot(plt)
 
-        # Actionable insights
-        st.subheader("Actionable Insights")
-        sorted_impact = impact_data.sort_values('Impact', ascending=False)
-        top_positive = sorted_impact.head(3)
-        top_negative = sorted_impact.tail(3)
-        
-        st.write("Top areas to maintain or improve:")
-        for _, row in top_positive.iterrows():
-            st.write(f"- {row['Metric']}: {row['Impact']:.2f}")
-        
-        st.write("Top areas to focus on improving:")
-        for _, row in top_negative.iterrows():
-            st.write(f"- {row['Metric']}: {row['Impact']:.2f}")
-
         # Documentation
-        st.subheader("How to use this app:")
+        st.subheader("Documentation:")
         st.write("""
-        1. Upload your CSV or Excel file containing call center metrics data.
-        2. Select your industry from the dropdown menu in the sidebar.
-        3. Adjust the sliders to input your current performance metrics.
-        4. The app will calculate z-scores based on your industry's averages and standard deviations.
-        5. Predicted FCR and Churn rates are calculated using a weighted sum of the z-scores.
-        6. The bar chart shows the impact of each metric on the predictions.
-        7. Actionable insights highlight the top areas for improvement and maintenance.
-
-        Note: This model uses simplified assumptions and should be used as a general guide rather than a precise predictor.
+        - **Industry selection**: Choose the industry your data belongs to.
+        - **Input section**: Enter your current performance metrics using the sliders.
+        - **Prediction and optimization**: The app uses statistical methods to predict FCR and Churn rates.
+        - **Impact Visualization**: See which metrics have the most impact on the predictions.
         """)
 else:
-    st.info("Please upload a CSV or Excel file to start the simulation.")
+    st.write("Please upload a CSV or Excel file to start the simulation.")
