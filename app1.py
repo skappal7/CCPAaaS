@@ -3,39 +3,48 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pingouin as pg
+import statsmodels.api as sm
+from sklearn.linear_model import LinearRegression
 
 # Function to process data
 def process_data(data):
-    # Remove 'Year' and 'Industry' columns if they exist
     columns_to_drop = ['Year', 'Industry']
     data = data.drop(columns=[col for col in columns_to_drop if col in data.columns])
-    
-    # Keep only numeric columns
     numeric_columns = data.select_dtypes(include=[np.number]).columns
     data = data[numeric_columns]
-    
     return data
 
-# Custom Random Forest-like feature importance
-def custom_feature_importance(X, y, n_iterations=100, sample_size=0.8):
-    n_samples, n_features = X.shape
-    feature_importances = np.zeros(n_features)
-    
-    for _ in range(n_iterations):
-        sample_indices = np.random.choice(n_samples, size=int(sample_size * n_samples), replace=True)
-        X_sample, y_sample = X.iloc[sample_indices], y.iloc[sample_indices]
-        
-        correlations = np.abs(X_sample.corrwith(y_sample))
-        feature_importances += correlations / correlations.sum()
-    
-    return feature_importances / n_iterations
+# Function to perform stepwise regression
+def stepwise_regression(X, y):
+    included = []
+    while True:
+        changed = False
+        excluded = list(set(X.columns) - set(included))
+        new_pval = pd.Series(index=excluded)
+        for new_col in excluded:
+            model = sm.OLS(y, sm.add_constant(pd.DataFrame(X[included + [new_col]]))).fit()
+            new_pval[new_col] = model.pvalues[new_col]
+        best_pval = new_pval.min()
+        if best_pval < 0.05:
+            best_feature = new_pval.idxmin()
+            included.append(best_feature)
+            changed = True
+        if not changed:
+            break
+    return included
 
 # Function to calculate improvements
-def calculate_improvements(data, target, desired_improvement):
+def calculate_improvements(data, target, desired_improvement, industry_benchmark):
     X = data.drop(columns=[target])
     y = data[target]
-    
-    feature_importances = custom_feature_importance(X, y)
+
+    # Perform stepwise regression to identify key predictors
+    predictors = stepwise_regression(X, y)
+    X = X[predictors]
+
+    # Calculate partial correlations
+    partial_corrs = {col: pg.partial_corr(data=data, x=col, y=target, covar=list(X.columns.difference([col]))).at['r', 'pearson'] for col in X.columns}
     
     improvements = {
         "Metric": [],
@@ -45,27 +54,25 @@ def calculate_improvements(data, target, desired_improvement):
         "Importance": [],
         "Units": []
     }
-    
-    for feature, importance in zip(X.columns, feature_importances):
+
+    for feature in X.columns:
         current_value = X[feature].median()
-        correlation = np.corrcoef(X[feature], y)[0, 1]
-        change = correlation * importance * desired_improvement * current_value / 100
+        correlation = partial_corrs[feature]
+        change = correlation * desired_improvement * current_value / 100
         new_value = current_value + change
-        
         units = "sec" if "Time" in feature or "ASA" in feature or "ACW" in feature or "AWT" in feature else ("%" if "%" in feature else "min")
-        
+
         improvements["Metric"].append(feature)
         improvements["Current Value"].append(f"{current_value:.2f}")
         improvements["Suggested Change"].append(f"{change:+.2f}")
         improvements["New Value"].append(f"{new_value:.2f}")
-        improvements["Importance"].append(f"{importance:.4f}")
+        improvements["Importance"].append(f"{correlation:.4f}")
         improvements["Units"].append(units)
     
     return pd.DataFrame(improvements).sort_values("Importance", ascending=False)
 
 # Streamlit app
 st.set_page_config(page_title="Call Center FCR and Churn Predictor", page_icon=":phone:", layout="wide")
-
 st.title("Call Center FCR and Churn Predictor")
 
 # File upload
@@ -83,6 +90,10 @@ if uploaded_file is not None:
         current_fcr = st.sidebar.number_input("Current FCR (%)", min_value=0.0, max_value=100.0, value=float(medians['First Call Resolution (FCR %)']))
         current_churn = st.sidebar.number_input("Current Churn Rate (%)", min_value=0.0, max_value=100.0, value=float(medians['Churn Rate (%)']))
 
+        # Industry benchmarks (example values)
+        industry_fcr_benchmark = 85.0
+        industry_churn_benchmark = 5.0
+
         # Main content area
         tab1, tab2 = st.tabs(["FCR and Churn Predictor", "Industry Trends"])
 
@@ -91,30 +102,30 @@ if uploaded_file is not None:
             col1, col2 = st.columns(2)
             with col1:
                 st.metric("Your FCR", f"{current_fcr:.2f}%", f"{current_fcr - medians['First Call Resolution (FCR %)']:.2f}%")
-                st.metric("Industry Median FCR", f"{medians['First Call Resolution (FCR %)']:.2f}%")
+                st.metric("Industry Median FCR", f"{industry_fcr_benchmark:.2f}%")
             with col2:
                 st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{current_churn - medians['Churn Rate (%)']:.2f}%")
-                st.metric("Industry Median Churn Rate", f"{medians['Churn Rate (%)']:.2f}%")
+                st.metric("Industry Median Churn Rate", f"{industry_churn_benchmark:.2f}%")
 
             # User input for desired improvement percentage
             col1, col2 = st.columns(2)
             with col1:
-                desired_fcr_improvement = st.number_input("Desired Improvement in FCR (%)", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
+                desired_fcr_improvement = st.number_input("Desired Improvement in FCR (%)", min_value=0.0, max_value=10.0, value  = 1.0, step=0.1)
             with col2:
-                desired_churn_improvement = st.number_input("Desired Reduction in Churn (%)", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
+                desired_churn_improvement = st.number_input("Desired Reduction in Churn (%)", min_value=0.0, max_value=10.0, value=-1.0, step=0.1)
 
             # Calculate and display improvements
             if st.button("Calculate Improvements"):
                 with st.spinner("Calculating improvements... This may take a moment."):
                     st.subheader(f"Suggested Changes for {desired_fcr_improvement}% FCR Improvement")
-                    fcr_improvement_df = calculate_improvements(data, 'First Call Resolution (FCR %)', desired_fcr_improvement)
+                    fcr_improvement_df = calculate_improvements(data, 'First Call Resolution (FCR %)', desired_fcr_improvement, industry_fcr_benchmark)
                     if not fcr_improvement_df.empty:
                         st.table(fcr_improvement_df)
                     else:
                         st.write("No significant changes suggested for FCR improvement.")
                     
                     st.subheader(f"Suggested Changes for {desired_churn_improvement}% Churn Reduction")
-                    churn_improvement_df = calculate_improvements(data, 'Churn Rate (%)', -desired_churn_improvement)  # Negative because we want to reduce churn
+                    churn_improvement_df = calculate_improvements(data, 'Churn Rate (%)', desired_churn_improvement, industry_churn_benchmark)
                     if not churn_improvement_df.empty:
                         st.table(churn_improvement_df)
                     else:
@@ -134,7 +145,7 @@ if uploaded_file is not None:
                         st.write(f"- To reduce Churn, consider {direction}ing {metric} by {abs(change):.2f} {units}. (Importance: {importance:.4f})")
 
                 # Fine print explanation
-                st.caption("These suggestions are based on a custom feature importance algorithm. The 'Importance' score indicates the relative impact of each metric. Use these as general guidance and consider the practical implications of each change in your specific context.")
+                st.caption("These suggestions are based on partial correlation and stepwise regression analysis. The 'Importance' score indicates the relative impact of each metric. Use these as general guidance and consider the practical implications of each change in your specific context.")
 
             # Visualizations in a collapsible section
             with st.expander("Visualizations"):
