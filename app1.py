@@ -43,8 +43,14 @@ def calculate_improvements(data, target, desired_improvement, industry_benchmark
     X = X[predictors]
 
     # Calculate partial correlations
-    partial_corrs = {col: pg.partial_corr(data=data, x=col, y=target, covar=list(X.columns.difference([col]))).at['r', 'pearson'] for col in X.columns}
-    
+    partial_corrs = {}
+    for col in X.columns:
+        try:
+            partial_corr = pg.partial_corr(data=data, x=col, y=target, covar=list(X.columns.difference([col])))
+            partial_corrs[col] = partial_corr['r'].values[0]
+        except:
+            partial_corrs[col] = 0
+
     improvements = {
         "Metric": [],
         "Current Value": [],
