@@ -54,6 +54,13 @@ st.markdown(
     .css-1v0mbdj {
         width: 80% !important;
     }
+    .css-1pjc44v {
+        font-size: 9pt;
+        font-family: "Poppins", sans-serif;
+    }
+    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4, .stMarkdown h5, .stMarkdown h6 {
+        font-family: "Poppins", sans-serif;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -108,12 +115,17 @@ if uploaded_file:
         def improvement_for_fcr():
             improvements = {
                 "Metric": [],
-                "Required Improvement": []
+                "Required Improvement": [],
+                "Change Direction": []
             }
             for metric in inputs.keys():
                 required_change = 1 / correlation_matrix['First Call Resolution (FCR %)'][metric]
                 improvements["Metric"].append(metric)
-                improvements["Required Improvement"].append(f"{required_change:.2f}")
+                if correlation_matrix['First Call Resolution (FCR %)'][metric] > 0:
+                    improvements["Change Direction"].append("Decrease")
+                else:
+                    improvements["Change Direction"].append("Increase")
+                improvements["Required Improvement"].append(f"{abs(required_change):.2f}")
             
             return pd.DataFrame(improvements)
 
