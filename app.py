@@ -45,8 +45,8 @@ industry = st.sidebar.selectbox("Select Industry", industries)
 # Input section with sliders starting from 0
 input_data = {}
 for column in common_columns:
-    max_value = data[column].max() if data[column].dtype in [np.int64, np.float64] else 100.0
-    input_data[column] = st.sidebar.slider(f"{column}", 0.0, max_value, 0.0)
+    max_value = float(data[column].max()) if data[column].dtype in [np.int64, np.float64] else 100.0
+    input_data[column] = st.sidebar.slider(f"{column}", 0.0, max_value, 0.0, step=0.1)
 
 input_data = pd.DataFrame(input_data, index=[0])
 
