@@ -3,8 +3,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy import stats
 
-# Function to process data
+# Function to process and normalize data
 def process_data(data):
     # Remove 'Year' and 'Industry' columns if they exist
     columns_to_drop = ['Year', 'Industry']
@@ -14,9 +15,14 @@ def process_data(data):
     numeric_columns = data.select_dtypes(include=[np.number]).columns
     data = data[numeric_columns]
     
-    return data
+    # Normalize data
+    return (data - data.min()) / (data.max() - data.min())
 
-# Custom Random Forest-like feature importance
+# Function to handle outliers
+def handle_outliers(data, lower_percentile=1, upper_percentile=99):
+    return data.clip(lower=data.quantile(lower_percentile/100), upper=data.quantile(upper_percentile/100))
+
+# Custom weighted feature importance
 def custom_feature_importance(X, y, n_iterations=100, sample_size=0.8):
     n_samples, n_features = X.shape
     feature_importances = np.zeros(n_features)
@@ -25,13 +31,15 @@ def custom_feature_importance(X, y, n_iterations=100, sample_size=0.8):
         sample_indices = np.random.choice(n_samples, size=int(sample_size * n_samples), replace=True)
         X_sample, y_sample = X.iloc[sample_indices], y.iloc[sample_indices]
         
-        correlations = np.abs(X_sample.corrwith(y_sample))
-        feature_importances += correlations / correlations.sum()
+        correlations = X_sample.corrwith(y_sample)
+        potential_improvements = 1 - X_sample.abs()
+        weighted_importances = correlations.abs() * potential_improvements.mean()
+        feature_importances += weighted_importances / weighted_importances.sum()
     
     return feature_importances / n_iterations
 
 # Function to calculate improvements
-def calculate_improvements(data, target, desired_improvement):
+def calculate_improvements(data, target, desired_improvement, threshold=0.05):
     X = data.drop(columns=[target])
     y = data[target]
     
@@ -40,26 +48,26 @@ def calculate_improvements(data, target, desired_improvement):
     improvements = {
         "Metric": [],
         "Current Value": [],
-        "Suggested Change": [],
+        "Suggested Change (%)": [],
         "New Value": [],
-        "Importance": [],
-        "Units": []
+        "Importance": []
     }
     
     for feature, importance in zip(X.columns, feature_importances):
+        if importance < threshold:
+            continue
+        
         current_value = X[feature].median()
         correlation = np.corrcoef(X[feature], y)[0, 1]
-        change = correlation * importance * desired_improvement * current_value / 100
-        new_value = current_value + change
-        
-        units = "sec" if "Time" in feature or "ASA" in feature or "ACW" in feature or "AWT" in feature else ("%" if "%" in feature else "min")
+        direction = 1 if (target == 'First Call Resolution (FCR %)') == (correlation > 0) else -1
+        change_percentage = direction * importance * desired_improvement
+        new_value = current_value + change_percentage
         
         improvements["Metric"].append(feature)
         improvements["Current Value"].append(f"{current_value:.2f}")
-        improvements["Suggested Change"].append(f"{change:+.2f}")
+        improvements["Suggested Change (%)"].append(f"{change_percentage:+.2f}%")
         improvements["New Value"].append(f"{new_value:.2f}")
         improvements["Importance"].append(f"{importance:.4f}")
-        improvements["Units"].append(units)
     
     return pd.DataFrame(improvements).sort_values("Importance", ascending=False)
 
@@ -73,10 +81,12 @@ uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
 if uploaded_file is not None:
     try:
         data = pd.read_csv(uploaded_file)
+        original_data = data.copy()
         data = process_data(data)
+        data = handle_outliers(data)
         
         # Calculate median for each metric
-        medians = data.median()
+        medians = original_data.median()
 
         # Sidebar for current performance input
         st.sidebar.header("Current Performance")
@@ -120,21 +130,18 @@ if uploaded_file is not None:
                     else:
                         st.write("No significant changes suggested for Churn reduction.")
 
-                # Explanations
-                if not fcr_improvement_df.empty or not churn_improvement_df.empty:
-                    st.subheader("Improvement Explanations")
-                    for _, row in fcr_improvement_df.iterrows():
-                        metric, change, units, importance = row['Metric'], float(row['Suggested Change']), row['Units'], float(row['Importance'])
-                        direction = "increase" if change > 0 else "decrease"
-                        st.write(f"- To improve FCR, consider {direction}ing {metric} by {abs(change):.2f} {units}. (Importance: {importance:.4f})")
-                    
-                    for _, row in churn_improvement_df.iterrows():
-                        metric, change, units, importance = row['Metric'], float(row['Suggested Change']), row['Units'], float(row['Importance'])
-                        direction = "increase" if change > 0 else "decrease"
-                        st.write(f"- To reduce Churn, consider {direction}ing {metric} by {abs(change):.2f} {units}. (Importance: {importance:.4f})")
-
-                # Fine print explanation
-                st.caption("These suggestions are based on a custom feature importance algorithm. The 'Importance' score indicates the relative impact of each metric. Use these as general guidance and consider the practical implications of each change in your specific context.")
+                # Explanation
+                st.markdown("""
+                These suggestions are based on a custom feature importance algorithm. The 'Importance' score indicates the relative impact of each metric. 
+                Use these as general guidance and consider the practical implications of each change in your specific context.
+                
+                **Methodology:**
+                - Data is normalized and outliers are handled to ensure fair comparisons.
+                - A weighted importance is calculated for each metric, considering both correlation with FCR/Churn and potential for improvement.
+                - Suggested changes are expressed as percentages of the current value.
+                - Only metrics with importance above a certain threshold are shown to focus on the most impactful changes.
+                - The direction of change (increase/decrease) is determined based on the metric's relationship with FCR/Churn.
+                """)
 
             # Visualizations in a collapsible section
             with st.expander("Visualizations"):
