@@ -17,7 +17,7 @@ st.markdown(
     <style>
     body {
         background-color: #f4f4f9;
-        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        font-family: "Poppins", sans-serif;
     }
     .css-1d391kg {
         background-color: #00a6d6;
@@ -51,6 +51,9 @@ st.markdown(
         background-color: #f4f4f9;
         border: 1px solid #06516F;
     }
+    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4, .stMarkdown h5, .stMarkdown h6 {
+        font-family: "Poppins", sans-serif;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -82,72 +85,95 @@ if uploaded_file:
     # Calculate correlation matrix
     correlation_matrix = data.corr()
 
-    # Display correlations heatmap
-    st.subheader("Correlation Heatmap")
-    plt.figure(figsize=(10, 6))
-    sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm')
-    st.pyplot(plt.gcf())
+    # Create tabs
+    tab1, tab2 = st.tabs(["FCR and Churn Predictor", "Industry Trends"])
 
-    # Display scatter plots for relationships
-    st.subheader("Relationships between Metrics")
-    selected_metric = st.selectbox("Select Metric to Compare with FCR and Churn", data.columns.drop(['First Call Resolution (FCR %)', 'Churn Rate (%)']))
-    fig, ax = plt.subplots(1, 2, figsize=(15, 6))
-    sns.scatterplot(data=data, x=selected_metric, y='First Call Resolution (FCR %)', ax=ax[0])
-    ax[0].set_title(f'{selected_metric} vs FCR')
-    sns.scatterplot(data=data, x=selected_metric, y='Churn Rate (%)', ax=ax[1])
-    ax[1].set_title(f'{selected_metric} vs Churn')
-    st.pyplot(fig)
+    with tab1:
+        # Expander section for metrics adjustment
+        with st.expander("Select Metrics"):
+            st.subheader("Adjust the Metrics")
+            inputs = {}
+            for column in data.columns.drop(['First Call Resolution (FCR %)', 'Churn Rate (%)']):
+                inputs[column] = st.slider(f"Adjust {column}", min_value=float(data[column].min()), max_value=float(data[column].max()), value=float(means[column]))
 
-    # User inputs via sliders
-    inputs = {}
-    with st.expander("Select Metrics"):
-        st.subheader("Adjust the Metrics")
-        for column in data.columns.drop(['First Call Resolution (FCR %)', 'Churn Rate (%)']):
-            inputs[column] = st.slider(f"Adjust {column}", min_value=float(data[column].min()), max_value=float(data[column].max()), value=float(means[column]))
+        # Function to predict FCR and Churn based on weighted sum approach
+        def predict_fcr_churn(inputs):
+            fcr_pred = np.dot([inputs[metric] for metric in inputs.keys()], [correlation_matrix['First Call Resolution (FCR %)'][metric] for metric in inputs.keys()])
+            churn_pred = np.dot([inputs[metric] for metric in inputs.keys()], [correlation_matrix['Churn Rate (%)'][metric] for metric in inputs.keys()])
+            fcr_pred = np.clip(fcr_pred, 0, 100)
+            churn_pred = np.clip(churn_pred, 0, 100)
+            return fcr_pred, churn_pred
 
-    # Function to predict FCR and Churn based on weighted sum approach
-    def predict_fcr_churn(inputs):
-        fcr_pred = np.dot([inputs[metric] for metric in inputs.keys()], [correlation_matrix['First Call Resolution (FCR %)'][metric] for metric in inputs.keys()])
-        churn_pred = np.dot([inputs[metric] for metric in inputs.keys()], [correlation_matrix['Churn Rate (%)'][metric] for metric in inputs.keys()])
-        fcr_pred = np.clip(fcr_pred, 0, 100)
-        churn_pred = np.clip(churn_pred, 0, 100)
-        return fcr_pred, churn_pred
+        # Predict button
+        if st.button("Predict FCR and Churn"):
+            fcr_pred, churn_pred = predict_fcr_churn(inputs)
+            st.write(f"Predicted FCR: {fcr_pred:.2f}%")
+            st.write(f"Predicted Churn: {churn_pred:.2f}%")
 
-    # Predict button
-    if st.button("Predict FCR and Churn"):
-        fcr_pred, churn_pred = predict_fcr_churn(inputs)
-        st.write(f"Predicted FCR: {fcr_pred:.2f}%")
-        st.write(f"Predicted Churn: {churn_pred:.2f}%")
+            # Impact analysis
+            st.subheader("Impact Analysis")
+            impact_data = {
+                "Metric": [],
+                "FCR Impact (%)": [],
+                "Churn Impact (%)": []
+            }
+            for metric in inputs.keys():
+                fcr_impact = correlation_matrix['First Call Resolution (FCR %)'][metric]
+                churn_impact = correlation_matrix['Churn Rate (%)'][metric]
+                impact_data["Metric"].append(metric)
+                impact_data["FCR Impact (%)"].append(fcr_impact * 100)
+                impact_data["Churn Impact (%)"].append(churn_impact * 100)
+            
+            impact_df = pd.DataFrame(impact_data)
+            st.table(impact_df)
 
-        # Impact analysis
-        st.subheader("Impact Analysis")
-        impact_data = {
-            "Metric": [],
-            "FCR Impact (%)": [],
-            "Churn Impact (%)": []
-        }
-        for metric in inputs.keys():
-            fcr_impact = correlation_matrix['First Call Resolution (FCR %)'][metric]
-            churn_impact = correlation_matrix['Churn Rate (%)'][metric]
-            impact_data["Metric"].append(metric)
-            impact_data["FCR Impact (%)"].append(fcr_impact * 100)
-            impact_data["Churn Impact (%)"].append(churn_impact * 100)
-        
-        impact_df = pd.DataFrame(impact_data)
-        st.table(impact_df)
+            # Generate auto-comments based on predictions
+            st.subheader("Insights and Recommendations")
+            st.write("### FCR Insights")
+            if fcr_pred > means['First Call Resolution (FCR %)']:
+                st.write(f"The predicted FCR is above the average of {means['First Call Resolution (FCR %)']:.2f}%, indicating an efficient resolution process.")
+            else:
+                st.write(f"The predicted FCR is below the average of {means['First Call Resolution (FCR %)']:.2f}%. Consider optimizing your resolution strategies.")
 
-        # Generate auto-comments based on predictions
-        st.subheader("Insights and Recommendations")
-        st.write("### FCR Insights")
-        if fcr_pred > means['First Call Resolution (FCR %)']:
-            st.write(f"The predicted FCR is above the average of {means['First Call Resolution (FCR %)']:.2f}%, indicating an efficient resolution process.")
-        else:
-            st.write(f"The predicted FCR is below the average of {means['First Call Resolution (FCR %)']:.2f}%. Consider optimizing your resolution strategies.")
+            st.write("### Churn Insights")
+            if churn_pred < means['Churn Rate (%)']:
+                st.write(f"The predicted Churn rate is below the average of {means['Churn Rate (%)']:.2f}%, indicating good customer retention.")
+            else:
+                st.write(f"The predicted Churn rate is above the average of {means['Churn Rate (%)']:.2f}%. Consider implementing strategies to improve customer satisfaction and retention.")
 
-        st.write("### Churn Insights")
-        if churn_pred < means['Churn Rate (%)']:
-            st.write(f"The predicted Churn rate is below the average of {means['Churn Rate (%)']:.2f}%, indicating good customer retention.")
-        else:
-            st.write(f"The predicted Churn rate is above the average of {means['Churn Rate (%)']:.2f}%. Consider implementing strategies to improve customer satisfaction and retention.")
+        # Visualizations in a collapsible section
+        with st.expander("Visualizations"):
+            st.subheader("Correlation Heatmap")
+            plt.figure(figsize=(8, 5))
+            sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm')
+            st.pyplot(plt.gcf())
+
+            st.subheader("Relationships between Metrics")
+            selected_metric = st.selectbox("Select Metric to Compare with FCR and Churn", data.columns.drop(['First Call Resolution (FCR %)', 'Churn Rate (%)']))
+            fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+            sns.scatterplot(data=data, x=selected_metric, y='First Call Resolution (FCR %)', ax=ax[0])
+            ax[0].set_title(f'{selected_metric} vs FCR')
+            sns.scatterplot(data=data, x=selected_metric, y='Churn Rate (%)', ax=ax[1])
+            ax[1].set_title(f'{selected_metric} vs Churn')
+            st.pyplot(fig)
+
+    with tab2:
+        st.subheader("Industry Trends")
+        st.write("Analyze the uploaded data to make sense of the industry trends.")
+        st.dataframe(data)
+
+    # Tech stack badges
+    st.markdown(
+        """
+        <div style='display: flex; justify-content: center;'>
+            <img src='https://img.shields.io/badge/Python-3.8-blue' style='margin: 5px;'>
+            <img src='https://img.shields.io/badge/Pandas-1.3.3-green' style='margin: 5px;'>
+            <img src='https://img.shields.io/badge/Streamlit-0.89.0-red' style='margin: 5px;'>
+            <img src='https://img.shields.io/badge/Matplotlib-3.4.3-orange' style='margin: 5px;'>
+            <img src='https://img.shields.io/badge/Seaborn-0.11.2-yellow' style='margin: 5px;'>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 else:
     st.info("Please upload a CSV file to proceed.")
