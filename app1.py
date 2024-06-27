@@ -3,8 +3,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import statsmodels.api as sm
-import pingouin as pg
 
 # Function to process data
 def process_data(data):
@@ -14,70 +12,35 @@ def process_data(data):
     data = data[numeric_columns]
     return data
 
-# Function to calculate partial correlations
-def calculate_partial_correlations(data, target):
-    partial_corrs = {}
-    for col in data.columns:
-        if col != target:
-            try:
-                partial_corr = pg.partial_corr(data=data, x=col, y=target, covar=list(data.columns.difference([col, target])))
-                partial_corrs[col] = partial_corr['r'].values[0]
-            except:
-                partial_corrs[col] = 0
-    return partial_corrs
-
-# Function to perform multiple regression
-def multiple_regression(data, target):
-    X = data.drop(columns=[target])
-    y = data[target]
-    X = sm.add_constant(X)
-    model = sm.OLS(y, X).fit()
-    return model
-
-# Function to calculate rule-based improvements
-def calculate_rule_based_improvements(data, target, rules):
+# Function to calculate improvements based on benchmarking
+def calculate_benchmark_improvements(data, target, relevant_metrics, industry_benchmark):
     improvements = {
         "Metric": [],
         "Current Value": [],
+        "Benchmark Value": [],
+        "Difference": [],
         "Suggested Change": [],
-        "New Value": [],
-        "Importance": [],
         "Units": []
     }
 
-    for rule in rules:
-        feature = rule['metric']
+    for feature in relevant_metrics:
         if feature in data.columns:
             current_value = data[feature].median()
-            suggested_change = rule['change']
-            new_value = current_value + suggested_change
-            importance = rule['importance']
-            units = rule['units']
+            benchmark_value = industry_benchmark.get(feature, np.nan)
+            if pd.notna(benchmark_value):
+                difference = current_value - benchmark_value
+                suggested_change = -difference  # To align with the benchmark
 
-            improvements["Metric"].append(feature)
-            improvements["Current Value"].append(f"{current_value:.2f}")
-            improvements["Suggested Change"].append(f"{suggested_change:+.2f}")
-            improvements["New Value"].append(f"{new_value:.2f}")
-            improvements["Importance"].append(f"{importance:.4f}")
-            improvements["Units"].append(units)
+                units = "sec" if "Time" in feature or "ASA" in feature or "ACW" in feature or "AWT" in feature else ("%" if "%" in feature else "min")
+
+                improvements["Metric"].append(feature)
+                improvements["Current Value"].append(f"{current_value:.2f}")
+                improvements["Benchmark Value"].append(f"{benchmark_value:.2f}")
+                improvements["Difference"].append(f"{difference:.2f}")
+                improvements["Suggested Change"].append(f"{suggested_change:+.2f}")
+                improvements["Units"].append(units)
     
-    return pd.DataFrame(improvements).sort_values("Importance", ascending=False)
-
-# Define rule-based recommendations based on domain knowledge
-def get_rule_based_recommendations(target):
-    if target == 'First Call Resolution (FCR %)':
-        return [
-            {'metric': 'Average Handling Time (AHT)', 'change': -30, 'importance': 0.8, 'units': 'sec'},
-            {'metric': 'After Call Work (ACW)', 'change': -5, 'importance': 0.6, 'units': 'sec'},
-            {'metric': 'Average Speed of Answer (ASA)', 'change': -3, 'importance': 0.4, 'units': 'sec'},
-        ]
-    elif target == 'Churn Rate (%)':
-        return [
-            {'metric': 'Customer Satisfaction (CSAT)', 'change': 5, 'importance': 0.8, 'units': '%'},
-            {'metric': 'Average Speed of Answer (ASA)', 'change': -3, 'importance': 0.6, 'units': 'sec'},
-            {'metric': 'After Call Work (ACW)', 'change': -5, 'importance': 0.4, 'units': 'sec'},
-        ]
-    return []
+    return pd.DataFrame(improvements).sort_values("Difference", ascending=False)
 
 # Streamlit app
 st.set_page_config(page_title="Call Center FCR and Churn Predictor", page_icon=":phone:", layout="wide")
@@ -98,6 +61,20 @@ if uploaded_file is not None:
         current_fcr = st.sidebar.number_input("Current FCR (%)", min_value=0.0, max_value=100.0, value=float(medians['First Call Resolution (FCR %)']))
         current_churn = st.sidebar.number_input("Current Churn Rate (%)", min_value=0.0, max_value=100.0, value=float(medians['Churn Rate (%)']))
 
+        # Industry benchmarks (example values)
+        industry_benchmark = {
+            'First Call Resolution (FCR %)': 85.0,
+            'Churn Rate (%)': 5.0,
+            'Average Handling Time (AHT)': 300.0,
+            'After Call Work (ACW)': 30.0,
+            'Average Speed of Answer (ASA)': 20.0,
+            'Customer Satisfaction (CSAT)': 90.0
+        }
+
+        # Define relevant metrics for FCR and Churn
+        relevant_metrics_fcr = ['Average Handling Time (AHT)', 'After Call Work (ACW)', 'Average Speed of Answer (ASA)']
+        relevant_metrics_churn = ['Customer Satisfaction (CSAT)', 'Average Speed of Answer (ASA)', 'After Call Work (ACW)']
+
         # Main content area
         tab1, tab2 = st.tabs(["FCR and Churn Predictor", "Industry Trends"])
 
@@ -105,46 +82,48 @@ if uploaded_file is not None:
             st.subheader("Performance Comparison")
             col1, col2 = st.columns(2)
             with col1:
-                st.metric("Your FCR", f"{current_fcr:.2f}%", f"{current_fcr - medians['First Call Resolution (FCR %)']:.2f}%")
+                st.metric("Your FCR", f"{current_fcr:.2f}%", f"{current_fcr - industry_benchmark['First Call Resolution (FCR %)']:.2f}%")
+                st.metric("Industry Median FCR", f"{industry_benchmark['First Call Resolution (FCR %)']:.2f}%")
             with col2:
-                st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{current_churn - medians['Churn Rate (%)']:.2f}%")
+                st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{current_churn - industry_benchmark['Churn Rate (%)']:.2f}%")
+                st.metric("Industry Median Churn Rate", f"{industry_benchmark['Churn Rate (%)']:.2f}%")
 
             # User input for desired improvement percentage
             desired_fcr_improvement = st.number_input("Desired Improvement in FCR (%)", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
             desired_churn_improvement = st.number_input("Desired Reduction in Churn (%)", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
 
-            # Calculate partial correlations and multiple regression results
-            st.subheader("Partial Correlation and Regression Analysis")
-            target_variable = st.selectbox("Select Target Variable", options=["First Call Resolution (FCR %)", "Churn Rate (%)"])
-            partial_correlations = calculate_partial_correlations(data, target_variable)
-            regression_model = multiple_regression(data, target_variable)
-
-            st.write("Partial Correlations:")
-            st.write(partial_correlations)
-            st.write("Multiple Regression Summary:")
-            st.write(regression_model.summary())
-
-            # Calculate and display rule-based improvements
+            # Calculate and display improvements based on benchmarking
             if st.button("Calculate Improvements"):
                 with st.spinner("Calculating improvements... This may take a moment."):
-                    st.subheader(f"Suggested Changes for {target_variable} Improvement")
-                    rules = get_rule_based_recommendations(target_variable)
-                    improvements_df = calculate_rule_based_improvements(data, target_variable, rules)
-                    if not improvements_df.empty:
-                        st.table(improvements_df)
+                    st.subheader(f"Suggested Changes for FCR Improvement")
+                    fcr_improvement_df = calculate_benchmark_improvements(data, 'First Call Resolution (FCR %)', relevant_metrics_fcr, industry_benchmark)
+                    if not fcr_improvement_df.empty:
+                        st.table(fcr_improvement_df)
                     else:
-                        st.write("No significant changes suggested.")
+                        st.write("No significant changes suggested for FCR improvement.")
+                    
+                    st.subheader(f"Suggested Changes for Churn Reduction")
+                    churn_improvement_df = calculate_benchmark_improvements(data, 'Churn Rate (%)', relevant_metrics_churn, industry_benchmark)
+                    if not churn_improvement_df.empty:
+                        st.table(churn_improvement_df)
+                    else:
+                        st.write("No significant changes suggested for Churn reduction.")
 
                 # Explanations
-                if not improvements_df.empty:
+                if not fcr_improvement_df.empty or not churn_improvement_df.empty:
                     st.subheader("Improvement Explanations")
-                    for _, row in improvements_df.iterrows():
-                        metric, change, units, importance = row['Metric'], float(row['Suggested Change']), row['Units'], float(row['Importance'])
+                    for _, row in fcr_improvement_df.iterrows():
+                        metric, change, units, importance = row['Metric'], float(row['Suggested Change']), row['Units'], float(row['Difference'])
                         direction = "increase" if change > 0 else "decrease"
-                        st.write(f"- To improve {target_variable}, consider {direction}ing {metric} by {abs(change):.2f} {units}. (Importance: {importance:.4f})")
+                        st.write(f"- To improve FCR, consider {direction}ing {metric} by {abs(change):.2f} {units}. (Difference: {importance:.2f})")
+                    
+                    for _, row in churn_improvement_df.iterrows():
+                        metric, change, units, importance = row['Metric'], float(row['Suggested Change']), row['Units'], float(row['Difference'])
+                        direction = "increase" if change > 0 else "decrease"
+                        st.write(f"- To reduce Churn, consider {direction}ing {metric} by {abs(change):.2f} {units}. (Difference: {importance:.2f})")
 
                 # Fine print explanation
-                st.caption("These suggestions are based on partial correlation, multiple regression, and rule-based recommendations. The 'Importance' score indicates the relative impact of each metric. Use these as general guidance and consider the practical implications of each change in your specific context.")
+                st.caption("These suggestions are based on benchmarking against industry standards. The 'Difference' score indicates how much each metric deviates from the benchmark. Use these as general guidance and consider the practical implications of each change in your specific context.")
 
             # Visualizations in a collapsible section
             with st.expander("Visualizations"):
