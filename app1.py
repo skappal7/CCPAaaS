@@ -79,16 +79,37 @@ def process_data(data):
         data = data.drop(columns=['Industry'])
     return data
 
-# Function to calculate realistic improvements
-def calculate_realistic_improvement(metric, target, correlation, desired_improvement, current_value):
-    max_change_percent = 0.1  # Maximum 10% change for any metric
-    base_change = desired_improvement * abs(correlation)
-    capped_change = min(base_change, max_change_percent * abs(current_value))
+# Function to calculate improvements
+def calculate_improvements(data, target, desired_improvement):
+    correlations = data.corr()[target].drop(target)
+    significant_correlations = correlations[abs(correlations) > 0.01]
     
-    if (target == 'FCR' and correlation > 0) or (target == 'Churn' and correlation < 0):
-        return capped_change
-    else:
-        return -capped_change
+    improvements = {
+        "Metric": [],
+        "Current Value": [],
+        "Suggested Change": [],
+        "New Value": [],
+        "Units": []
+    }
+    
+    for metric, correlation in significant_correlations.items():
+        current_value = data[metric].mean()
+        raw_change = (desired_improvement * correlation * current_value) / sum(abs(significant_correlations))
+        min_change = max(0.01 * abs(current_value), 1)  # 1% or 1 unit, whichever is larger
+        max_change = 0.1 * abs(current_value)  # 10% cap
+        
+        suggested_change = np.clip(raw_change, -max_change, max_change)
+        if abs(suggested_change) >= min_change:
+            new_value = current_value + suggested_change
+            units = "sec" if "Time" in metric or "ASA" in metric or "ACW" in metric or "AWT" in metric else ("%" if "%" in metric else "min")
+            
+            improvements["Metric"].append(metric)
+            improvements["Current Value"].append(f"{current_value:.2f}")
+            improvements["Suggested Change"].append(f"{suggested_change:+.2f}")
+            improvements["New Value"].append(f"{new_value:.2f}")
+            improvements["Units"].append(units)
+
+    return pd.DataFrame(improvements)
 
 # Streamlit app
 st.title("Call Center FCR and Churn Predictor")
@@ -106,46 +127,10 @@ if uploaded_file:
     # Calculate correlation matrix
     correlation_matrix = data.corr()
 
-    # Sidebar for metric adjustments and current performance input
+    # Sidebar for current performance input
     st.sidebar.header("Current Performance")
     current_fcr = st.sidebar.number_input("Current FCR (%)", min_value=0.0, max_value=100.0, value=float(means['First Call Resolution (FCR %)']))
     current_churn = st.sidebar.number_input("Current Churn Rate (%)", min_value=0.0, max_value=100.0, value=float(means['Churn Rate (%)']))
-
-    st.sidebar.header("Adjust Metrics")
-    inputs = {}
-    for column in data.columns.drop(['First Call Resolution (FCR %)', 'Churn Rate (%)']):
-        inputs[column] = st.sidebar.slider(f"{column}", min_value=float(data[column].min()), max_value=float(data[column].max()), value=float(means[column]), key=column)
-
-    # Function to calculate required metric improvements
-    def improvement_for_target(target, desired_improvement, inputs):
-        improvements = {
-            "Metric": [],
-            "Current Value": [],
-            "Suggested Change": [],
-            "New Value": [],
-            "Units": []
-        }
-        for metric in inputs.keys():
-            correlation = correlation_matrix[target][metric]
-            if abs(correlation) > 0.05:  # Lowered threshold to include more metrics
-                current_value = inputs[metric]
-                required_change = calculate_realistic_improvement(
-                    current_value, 
-                    'FCR' if target == 'First Call Resolution (FCR %)' else 'Churn', 
-                    correlation, 
-                    desired_improvement,
-                    current_value
-                )
-                units = "sec" if "Time" in metric or "ASA" in metric or "ACW" in metric or "AWT" in metric else ("%" if "%" in metric else "min")
-                new_value = current_value + required_change
-                
-                improvements["Metric"].append(metric)
-                improvements["Current Value"].append(f"{current_value:.2f}")
-                improvements["Suggested Change"].append(f"{required_change:+.2f}")
-                improvements["New Value"].append(f"{new_value:.2f}")
-                improvements["Units"].append(units)
-        
-        return pd.DataFrame(improvements)
 
     # Main content area
     tab1, tab2 = st.tabs(["FCR and Churn Predictor", "Industry Trends"])
@@ -170,14 +155,14 @@ if uploaded_file:
         # Calculate and display improvements
         if st.button("Calculate Improvements"):
             st.subheader(f"Suggested Changes for {desired_fcr_improvement}% FCR Improvement")
-            fcr_improvement_df = improvement_for_target('First Call Resolution (FCR %)', desired_fcr_improvement, inputs)
+            fcr_improvement_df = calculate_improvements(data, 'First Call Resolution (FCR %)', desired_fcr_improvement)
             if not fcr_improvement_df.empty:
                 st.table(fcr_improvement_df)
             else:
                 st.write("No significant changes suggested for FCR improvement.")
             
             st.subheader(f"Suggested Changes for {desired_churn_improvement}% Churn Reduction")
-            churn_improvement_df = improvement_for_target('Churn Rate (%)', desired_churn_improvement, inputs)
+            churn_improvement_df = calculate_improvements(data, 'Churn Rate (%)', -desired_churn_improvement)  # Negative because we want to reduce churn
             if not churn_improvement_df.empty:
                 st.table(churn_improvement_df)
             else:
