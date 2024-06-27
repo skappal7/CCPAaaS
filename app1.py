@@ -31,7 +31,7 @@ def custom_feature_importance(X, y, n_iterations=100, sample_size=0.8):
     return feature_importances / n_iterations
 
 # Function to calculate improvements
-def calculate_improvements(data, target, desired_improvement):
+def calculate_improvements(data, target, desired_improvement, min_change_threshold=0.01):
     X = data.drop(columns=[target])
     y = data[target]
     
@@ -49,17 +49,22 @@ def calculate_improvements(data, target, desired_improvement):
     for feature, importance in zip(X.columns, feature_importances):
         current_value = X[feature].median()
         correlation = np.corrcoef(X[feature], y)[0, 1]
-        change = correlation * importance * desired_improvement * current_value / 100
-        new_value = current_value + change
         
-        units = "sec" if "Time" in feature or "ASA" in feature or "ACW" in feature or "AWT" in feature else ("%" if "%" in feature else "min")
+        # Adjust change calculation
+        change = correlation * importance * desired_improvement * current_value / 10  # Increased sensitivity
         
-        improvements["Metric"].append(feature)
-        improvements["Current Value"].append(f"{current_value:.2f}")
-        improvements["Suggested Change"].append(f"{change:+.2f}")
-        improvements["New Value"].append(f"{new_value:.2f}")
-        improvements["Importance"].append(f"{importance:.4f}")
-        improvements["Units"].append(units)
+        # Only suggest changes above the minimum threshold
+        if abs(change) >= min_change_threshold * current_value:
+            new_value = current_value + change
+            
+            units = "sec" if "Time" in feature or "ASA" in feature or "ACW" in feature or "AWT" in feature else ("%" if "%" in feature else "min")
+            
+            improvements["Metric"].append(feature)
+            improvements["Current Value"].append(f"{current_value:.2f}")
+            improvements["Suggested Change"].append(f"{change:+.2f}")
+            improvements["New Value"].append(f"{new_value:.2f}")
+            improvements["Importance"].append(f"{importance:.4f}")
+            improvements["Units"].append(units)
     
     return pd.DataFrame(improvements).sort_values("Importance", ascending=False)
 
@@ -84,17 +89,17 @@ if uploaded_file is not None:
         current_churn = st.sidebar.number_input("Current Churn Rate (%)", min_value=0.0, max_value=100.0, value=float(medians['Churn Rate (%)']))
 
         # Main content area
-        tab1, tab2 = st.tabs(["FCR and Churn Predictor", "Industry Trends"])
+        tab1, tab2 = st.tabs(["FCR and Churn Predictor", "Dataset Trends"])
 
         with tab1:
             st.subheader("Performance Comparison")
             col1, col2 = st.columns(2)
             with col1:
                 st.metric("Your FCR", f"{current_fcr:.2f}%", f"{current_fcr - medians['First Call Resolution (FCR %)']:.2f}%")
-                st.metric("Industry Median FCR", f"{medians['First Call Resolution (FCR %)']:.2f}%")
+                st.metric("Dataset Median FCR", f"{medians['First Call Resolution (FCR %)']:.2f}%")
             with col2:
                 st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{current_churn - medians['Churn Rate (%)']:.2f}%")
-                st.metric("Industry Median Churn Rate", f"{medians['Churn Rate (%)']:.2f}%")
+                st.metric("Dataset Median Churn Rate", f"{medians['Churn Rate (%)']:.2f}%")
 
             # User input for desired improvement percentage
             col1, col2 = st.columns(2)
@@ -168,8 +173,8 @@ if uploaded_file is not None:
                 st.pyplot(fig)
 
         with tab2:
-            st.subheader("Industry Trends")
-            st.write("This section could include more detailed analysis of industry trends based on the uploaded data.")
+            st.subheader("Dataset Trends")
+            st.write("This section could include more detailed analysis of trends based on the uploaded data.")
 
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
