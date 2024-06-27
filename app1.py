@@ -4,32 +4,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Function to process and normalize data
+# Function to process data
 def process_data(data):
-    # Remove 'Industry' and 'Year' columns if they exist
-    columns_to_drop = ['Industry', 'Year']
+    # Remove 'Year' and 'Industry' columns if they exist
+    columns_to_drop = ['Year', 'Industry']
     data = data.drop(columns=[col for col in columns_to_drop if col in data.columns])
     
     # Keep only numeric columns
     numeric_columns = data.select_dtypes(include=[np.number]).columns
     data = data[numeric_columns]
     
-    # Check if required columns exist
-    required_columns = ['First Call Resolution (FCR %)', 'Churn Rate (%)']
-    for col in required_columns:
-        if col not in data.columns:
-            raise ValueError(f"Required column '{col}' not found in the data.")
-    
-    # Normalize data
-    return (data - data.min()) / (data.max() - data.min())
+    return data
 
-# Function to handle outliers
-def handle_outliers(data, lower_percentile=1, upper_percentile=99):
-    lower = np.percentile(data, lower_percentile)
-    upper = np.percentile(data, upper_percentile)
-    return np.clip(data, lower, upper)
-
-# Custom weighted feature importance
+# Custom Random Forest-like feature importance
 def custom_feature_importance(X, y, n_iterations=100, sample_size=0.8):
     n_samples, n_features = X.shape
     feature_importances = np.zeros(n_features)
@@ -38,15 +25,13 @@ def custom_feature_importance(X, y, n_iterations=100, sample_size=0.8):
         sample_indices = np.random.choice(n_samples, size=int(sample_size * n_samples), replace=True)
         X_sample, y_sample = X.iloc[sample_indices], y.iloc[sample_indices]
         
-        correlations = X_sample.corrwith(y_sample)
-        potential_improvements = 1 - X_sample.abs()
-        weighted_importances = correlations.abs() * potential_improvements.mean()
-        feature_importances += weighted_importances / weighted_importances.sum()
+        correlations = np.abs(X_sample.corrwith(y_sample))
+        feature_importances += correlations / correlations.sum()
     
     return feature_importances / n_iterations
 
 # Function to calculate improvements
-def calculate_improvements(data, target, desired_improvement, threshold=0.05):
+def calculate_improvements(data, target, desired_improvement):
     X = data.drop(columns=[target])
     y = data[target]
     
@@ -55,26 +40,26 @@ def calculate_improvements(data, target, desired_improvement, threshold=0.05):
     improvements = {
         "Metric": [],
         "Current Value": [],
-        "Suggested Change (%)": [],
+        "Suggested Change": [],
         "New Value": [],
-        "Importance": []
+        "Importance": [],
+        "Units": []
     }
     
     for feature, importance in zip(X.columns, feature_importances):
-        if importance < threshold:
-            continue
-        
         current_value = X[feature].median()
         correlation = np.corrcoef(X[feature], y)[0, 1]
-        direction = 1 if (target == 'First Call Resolution (FCR %)') == (correlation > 0) else -1
-        change_percentage = direction * importance * desired_improvement
-        new_value = current_value + change_percentage
+        change = correlation * importance * desired_improvement * current_value / 100
+        new_value = current_value + change
+        
+        units = "sec" if "Time" in feature or "ASA" in feature or "ACW" in feature or "AWT" in feature else ("%" if "%" in feature else "min")
         
         improvements["Metric"].append(feature)
         improvements["Current Value"].append(f"{current_value:.2f}")
-        improvements["Suggested Change (%)"].append(f"{change_percentage:+.2f}%")
+        improvements["Suggested Change"].append(f"{change:+.2f}")
         improvements["New Value"].append(f"{new_value:.2f}")
         improvements["Importance"].append(f"{importance:.4f}")
+        improvements["Units"].append(units)
     
     return pd.DataFrame(improvements).sort_values("Importance", ascending=False)
 
@@ -88,14 +73,7 @@ uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
 if uploaded_file is not None:
     try:
         data = pd.read_csv(uploaded_file)
-        st.write("Original columns:", data.columns.tolist())
-        
-        original_data = data.copy()
         data = process_data(data)
-        
-        st.write("Processed columns:", data.columns.tolist())
-        
-        data = data.apply(handle_outliers)
         
         # Calculate median for each metric
         medians = data.median()
@@ -106,17 +84,17 @@ if uploaded_file is not None:
         current_churn = st.sidebar.number_input("Current Churn Rate (%)", min_value=0.0, max_value=100.0, value=float(medians['Churn Rate (%)']))
 
         # Main content area
-        tab1, tab2 = st.tabs(["FCR and Churn Predictor", "Dataset Trends"])
+        tab1, tab2 = st.tabs(["FCR and Churn Predictor", "Industry Trends"])
 
         with tab1:
             st.subheader("Performance Comparison")
             col1, col2 = st.columns(2)
             with col1:
                 st.metric("Your FCR", f"{current_fcr:.2f}%", f"{current_fcr - medians['First Call Resolution (FCR %)']:.2f}%")
-                st.metric("Dataset Median FCR", f"{medians['First Call Resolution (FCR %)']:.2f}%")
+                st.metric("Industry Median FCR", f"{medians['First Call Resolution (FCR %)']:.2f}%")
             with col2:
                 st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{current_churn - medians['Churn Rate (%)']:.2f}%")
-                st.metric("Dataset Median Churn Rate", f"{medians['Churn Rate (%)']:.2f}%")
+                st.metric("Industry Median Churn Rate", f"{medians['Churn Rate (%)']:.2f}%")
 
             # User input for desired improvement percentage
             col1, col2 = st.columns(2)
@@ -142,18 +120,21 @@ if uploaded_file is not None:
                     else:
                         st.write("No significant changes suggested for Churn reduction.")
 
-                # Explanation
-                st.markdown("""
-                These suggestions are based on a custom feature importance algorithm. The 'Importance' score indicates the relative impact of each metric. 
-                Use these as general guidance and consider the practical implications of each change in your specific context.
-                
-                **Methodology:**
-                - Data is normalized and outliers are handled to ensure fair comparisons.
-                - A weighted importance is calculated for each metric, considering both correlation with FCR/Churn and potential for improvement.
-                - Suggested changes are expressed as percentages of the current value.
-                - Only metrics with importance above a certain threshold are shown to focus on the most impactful changes.
-                - The direction of change (increase/decrease) is determined based on the metric's relationship with FCR/Churn.
-                """)
+                # Explanations
+                if not fcr_improvement_df.empty or not churn_improvement_df.empty:
+                    st.subheader("Improvement Explanations")
+                    for _, row in fcr_improvement_df.iterrows():
+                        metric, change, units, importance = row['Metric'], float(row['Suggested Change']), row['Units'], float(row['Importance'])
+                        direction = "increase" if change > 0 else "decrease"
+                        st.write(f"- To improve FCR, consider {direction}ing {metric} by {abs(change):.2f} {units}. (Importance: {importance:.4f})")
+                    
+                    for _, row in churn_improvement_df.iterrows():
+                        metric, change, units, importance = row['Metric'], float(row['Suggested Change']), row['Units'], float(row['Importance'])
+                        direction = "increase" if change > 0 else "decrease"
+                        st.write(f"- To reduce Churn, consider {direction}ing {metric} by {abs(change):.2f} {units}. (Importance: {importance:.4f})")
+
+                # Fine print explanation
+                st.caption("These suggestions are based on a custom feature importance algorithm. The 'Importance' score indicates the relative impact of each metric. Use these as general guidance and consider the practical implications of each change in your specific context.")
 
             # Visualizations in a collapsible section
             with st.expander("Visualizations"):
@@ -187,14 +168,11 @@ if uploaded_file is not None:
                 st.pyplot(fig)
 
         with tab2:
-            st.subheader("Dataset Trends")
-            st.write("This section could include more detailed analysis of trends based on the uploaded data.")
+            st.subheader("Industry Trends")
+            st.write("This section could include more detailed analysis of industry trends based on the uploaded data.")
 
-    except ValueError as ve:
-        st.error(f"Error in data processing: {str(ve)}")
-        st.write("Please ensure your CSV file contains the required numeric columns, including 'First Call Resolution (FCR %)' and 'Churn Rate (%)'.")
     except Exception as e:
-        st.error(f"An unexpected error occurred: {str(e)}")
+        st.error(f"An error occurred: {str(e)}")
         st.write("Please check your CSV file and try again. Ensure all relevant columns contain numeric data.")
 
 # Run the Streamlit app
