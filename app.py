@@ -2,142 +2,114 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 
-# Set page configuration and theme
-st.set_page_config(page_title="Performance Optimizer Pro", layout="wide")
-st.markdown("""
-    <style>
-    .main {
-        background-color: #ffffff;
-        color: #000000;
-        font-family: 'Poppins', sans-serif;
-    }
-    .sidebar .sidebar-content {
-        background-color: #07B1FC;
-        color: #ffffff;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+# Load and preprocess data
+@st.cache_data
+def load_data():
+    df = pd.read_csv('paste.txt', sep='\t')
+    return df
 
-# Title and description
-st.title("Performance Optimizer Pro")
-st.write("Predict and optimize your First Call Resolution (FCR) and Churn rates based on your performance metrics.")
+df = load_data()
 
-# File uploader for data
-uploaded_file = st.file_uploader("Upload your CSV or Excel file", type=['csv', 'xlsx'])
-if uploaded_file is not None:
-    if uploaded_file.name.endswith('.csv'):
-        data = pd.read_csv(uploaded_file)
+# Calculate industry statistics
+def calculate_industry_stats(df):
+    metrics = ['Average Call Duration (min)', 'Hold Time (sec)', 'Abandonment Rate (%)', 
+               'ASA (sec)', 'ACW (sec)', 'Sentiment Score', 'CSAT (%)', 
+               'Average Waiting Time (AWT sec)', 'Average Handle Time (AHT min)', 
+               'Call Transfer Rate (%)', 'First Call Resolution (FCR %)', 'Churn Rate (%)']
+    
+    industry_stats = df.groupby('Industry')[metrics].agg(['mean', 'std'])
+    return industry_stats
+
+industry_stats = calculate_industry_stats(df)
+
+# Streamlit app
+st.title('Call Center Performance Predictor')
+
+# User inputs
+industry = st.selectbox('Select your industry', df['Industry'].unique())
+
+st.subheader('Enter your metrics:')
+user_metrics = {}
+for metric in industry_stats.columns.levels[0]:
+    if metric not in ['First Call Resolution (FCR %)', 'Churn Rate (%)']:
+        user_metrics[metric] = st.slider(f'{metric}', 
+                                         0.0,  # Set minimum to 0
+                                         float(df[metric].max()), 
+                                         float(df[metric].mean()))
+
+# Calculate z-scores
+z_scores = {}
+for metric, value in user_metrics.items():
+    mean = industry_stats.loc[industry, (metric, 'mean')]
+    std = industry_stats.loc[industry, (metric, 'std')]
+    z_scores[metric] = (value - mean) / std
+
+# Define weights (you may want to adjust these based on domain knowledge)
+weights = {
+    'Average Call Duration (min)': -0.1,
+    'Hold Time (sec)': -0.15,
+    'Abandonment Rate (%)': -0.2,
+    'ASA (sec)': -0.1,
+    'ACW (sec)': -0.05,
+    'Sentiment Score': 0.15,
+    'CSAT (%)': 0.2,
+    'Average Waiting Time (AWT sec)': -0.05,
+    'Average Handle Time (AHT min)': -0.1,
+    'Call Transfer Rate (%)': -0.1
+}
+
+# Ensure weights match the input metrics
+for metric in user_metrics:
+    if metric not in weights:
+        weights[metric] = 0  # Assign a default weight of 0 for any missing metrics
+
+# Calculate predictions
+fcr_prediction = sum(z_scores[metric] * weights[metric] for metric in z_scores)
+churn_prediction = -fcr_prediction  # Assuming inverse relationship
+
+# Display predictions
+st.subheader('Predictions:')
+st.write(f'Predicted FCR: {50 + fcr_prediction*10:.2f}%')
+st.write(f'Predicted Churn Rate: {10 + churn_prediction:.2f}%')
+
+# Visualize impact
+st.subheader('Metric Impact on Predictions:')
+fig, ax = plt.subplots(figsize=(10, 6))
+impact = [z_scores[metric] * weights[metric] for metric in z_scores]
+ax.bar(z_scores.keys(), impact)
+plt.xticks(rotation=45, ha='right')
+plt.title('Impact of Metrics on Predictions')
+plt.tight_layout()
+st.pyplot(fig)
+
+# Actionable insights
+st.subheader('Actionable Insights:')
+sorted_impact = sorted(zip(z_scores.keys(), impact), key=lambda x: abs(x[1]), reverse=True)
+for metric, imp in sorted_impact[:3]:
+    if imp > 0:
+        st.write(f"- Maintain or improve your performance in {metric}")
     else:
-        data = pd.read_excel(uploaded_file)
+        st.write(f"- Focus on improving your {metric}")
 
-    # Preprocess data to calculate industry averages and standard deviations
-    industry_stats = data.groupby('Industry').agg(['mean', 'std']).reset_index()
+# Documentation
+st.subheader('How to use this app:')
+st.write("""
+1. Select your industry from the dropdown menu.
+2. Adjust the sliders to input your current performance metrics. All sliders start at 0 for you to set your exact values.
+3. The app will calculate z-scores based on your industry's averages and standard deviations.
+4. Predicted FCR and Churn rates are calculated using a weighted sum of the z-scores.
+5. The bar chart shows the impact of each metric on the predictions.
+6. Actionable insights highlight the top areas for improvement.
 
-    # Sidebar for user inputs
-    st.sidebar.title("Input Metrics")
-    st.sidebar.write("Enter your current performance metrics.")
+Note: This model uses simplified assumptions and should be used as a general guide rather than a precise predictor.
+""")
 
-    # Industry selection
-    industries = industry_stats['Industry'].unique()
-    industry = st.sidebar.selectbox("Select Industry", industries)
-
-    # Input section
-    average_call_duration = st.sidebar.slider("Average Call Duration (min)", 0.0, 60.0, 5.0)
-    hold_time = st.sidebar.slider("Hold Time (sec)", 0.0, 1000.0, 50.0)
-    abandonment_rate = st.sidebar.slider("Abandonment Rate (%)", 0.0, 100.0, 5.0)
-    asa = st.sidebar.slider("ASA (sec)", 0.0, 1000.0, 50.0)
-    acw = st.sidebar.slider("ACW (sec)", 0.0, 1000.0, 50.0)
-    sentiment_score = st.sidebar.slider("Sentiment Score", 0.0, 100.0, 50.0)
-    csat = st.sidebar.slider("CSAT (%)", 0.0, 100.0, 50.0)
-    average_waiting_time = st.sidebar.slider("Average Waiting Time (AWT sec)", 0.0, 1000.0, 50.0)
-    average_handle_time = st.sidebar.slider("Average Handle Time (AHT min)", 0.0, 60.0, 5.0)
-    call_transfer_rate = st.sidebar.slider("Call Transfer Rate (%)", 0.0, 100.0, 5.0)
-
-    # Create a DataFrame from the input data
-    input_data = pd.DataFrame({
-        'Average Call Duration (min)': [average_call_duration],
-        'Hold Time (sec)': [hold_time],
-        'Abandonment Rate (%)': [abandonment_rate],
-        'ASA (sec)': [asa],
-        'ACW (sec)': [acw],
-        'Sentiment Score': [sentiment_score],
-        'CSAT (%)': [csat],
-        'Average Waiting Time (AWT sec)': [average_waiting_time],
-        'Average Handle Time (AHT min)': [average_handle_time],
-        'Call Transfer Rate (%)': [call_transfer_rate]
-    })
-
-    # Function to calculate z-scores
-    def calculate_z_scores(input_data, industry):
-        # Select the relevant industry statistics
-        industry_mean = industry_stats[industry_stats['Industry'] == industry].xs('mean', level=1, axis=1)
-        industry_std = industry_stats[industry_stats['Industry'] == industry].xs('std', level=1, axis=1)
-        
-        # Align columns
-        industry_mean = industry_mean[input_data.columns]
-        industry_std = industry_std[input_data.columns]
-        
-        # Calculate z-scores
-        z_scores = (input_data - industry_mean) / industry_std
-        return z_scores
-
-    # Calculate z-scores
-    z_scores = calculate_z_scores(input_data, industry).squeeze()
-
-    # Debug prints to check lengths
-    st.write(f"Number of input metrics: {len(input_data.columns)}")
-    st.write(f"Number of z-scores: {len(z_scores)}")
-
-    # Ensure z_scores and weights have the same length
-    if len(z_scores) != len(input_data.columns):
-        st.error("Mismatch in the number of z-scores and metrics. Please check the input data.")
-    else:
-        # Weighted sum for predictions (weights can be adjusted based on domain expertise)
-        weights = {
-            'Average Call Duration (min)': 0.2,
-            'Hold Time (sec)': 0.1,
-            'Abandonment Rate (%)': 0.15,
-            'ASA (sec)': 0.1,
-            'ACW (sec)': 0.05,
-            'Sentiment Score': 0.1,
-            'CSAT (%)': 0.1,
-            'Average Waiting Time (AWT sec)': 0.05,
-            'Average Handle Time (AHT min)': 0.05,
-            'Call Transfer Rate (%)': 0.1
-        }
-
-        weights_series = pd.Series(weights)
-        predicted_fcr = np.sum(z_scores * weights_series)
-        predicted_churn = np.sum(z_scores * weights_series)
-
-        # Display predictions
-        st.subheader("Predicted First Call Resolution (FCR) and Churn Rates")
-        st.write(f"Predicted FCR: {predicted_fcr:.2f}%")
-        st.write(f"Predicted Churn Rate: {predicted_churn:.2f}%")
-
-        # Visualization of impact
-        st.subheader("Impact of Metrics on Predictions")
-        impact_data = pd.DataFrame({
-            'Metric': input_data.columns,
-            'Impact on FCR': z_scores * weights_series.values,
-            'Impact on Churn': z_scores * weights_series.values
-        })
-        impact_data = impact_data.melt(id_vars='Metric', var_name='Prediction', value_name='Impact')
-
-        plt.figure(figsize=(10, 6))
-        sns.barplot(x='Impact', y='Metric', hue='Prediction', data=impact_data)
-        plt.title('Impact of Metrics on FCR and Churn Predictions')
-        st.pyplot(plt)
-
-        # Documentation
-        st.subheader("Documentation:")
-        st.write("""
-        - **Industry selection**: Choose the industry your data belongs to.
-        - **Input section**: Enter your current performance metrics using the sliders.
-        - **Prediction and optimization**: The app uses statistical methods to predict FCR and Churn rates.
-        - **Impact Visualization**: See which metrics have the most impact on the predictions.
-        """)
+# Display input counts
+st.subheader('Verification:')
+st.write(f"Number of user inputs: {len(user_metrics)}")
+st.write(f"Number of z-scores calculated: {len(z_scores)}")
+if len(user_metrics) == len(z_scores):
+    st.write("✅ Input count matches z-score count.")
 else:
-    st.write("Please upload a CSV or Excel file to start the simulation.")
+    st.write("❌ Input count does not match z-score count. Please check the code.")
