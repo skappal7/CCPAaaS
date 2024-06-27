@@ -51,8 +51,8 @@ st.markdown(
         background-color: #f4f4f9;
         border: 1px solid #06516F;
     }
-    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4, .stMarkdown h5, .stMarkdown h6 {
-        font-family: "Poppins", sans-serif;
+    .css-1v0mbdj {
+        width: 80% !important;
     }
     </style>
     """,
@@ -94,7 +94,7 @@ if uploaded_file:
             st.subheader("Adjust the Metrics")
             inputs = {}
             for column in data.columns.drop(['First Call Resolution (FCR %)', 'Churn Rate (%)']):
-                inputs[column] = st.slider(f"Adjust {column}", min_value=float(data[column].min()), max_value=float(data[column].max()), value=float(means[column]))
+                inputs[column] = st.slider(f"Adjust {column}", min_value=float(data[column].min()), max_value=float(data[column].max()), value=float(means[column]), key=column)
 
         # Function to predict FCR and Churn based on weighted sum approach
         def predict_fcr_churn(inputs):
@@ -103,6 +103,19 @@ if uploaded_file:
             fcr_pred = np.clip(fcr_pred, 0, 100)
             churn_pred = np.clip(churn_pred, 0, 100)
             return fcr_pred, churn_pred
+
+        # Function to calculate required metric improvements to improve FCR by 1%
+        def improvement_for_fcr():
+            improvements = {
+                "Metric": [],
+                "Required Improvement": []
+            }
+            for metric in inputs.keys():
+                required_change = 1 / correlation_matrix['First Call Resolution (FCR %)'][metric]
+                improvements["Metric"].append(metric)
+                improvements["Required Improvement"].append(f"{required_change:.2f}")
+            
+            return pd.DataFrame(improvements)
 
         # Predict button
         if st.button("Predict FCR and Churn"):
@@ -126,6 +139,11 @@ if uploaded_file:
             
             impact_df = pd.DataFrame(impact_data)
             st.table(impact_df)
+
+            # Required improvements for 1% FCR improvement
+            st.subheader("Required Improvements for 1% FCR Improvement")
+            improvement_df = improvement_for_fcr()
+            st.table(improvement_df)
 
             # Generate auto-comments based on predictions
             st.subheader("Insights and Recommendations")
