@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pingouin as pg
 import statsmodels.api as sm
-from sklearn.linear_model import LinearRegression
 
 # Function to process data
 def process_data(data):
@@ -110,9 +109,9 @@ if uploaded_file is not None:
             # User input for desired improvement percentage
             col1, col2 = st.columns(2)
             with col1:
-                desired_fcr_improvement = st.number_input("Desired Improvement in FCR (%)", min_value=0.0, max_value=10.0, value  = 1.0, step=0.1)
+                desired_fcr_improvement = st.number_input("Desired Improvement in FCR (%)", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
             with col2:
-                desired_churn_improvement = st.number_input("Desired Reduction in Churn (%)", min_value=0.0, max_value=10.0, value=-1.0, step=0.1)
+                desired_churn_improvement = st.number_input("Desired Reduction in Churn (%)", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
 
             # Calculate and display improvements
             if st.button("Calculate Improvements"):
