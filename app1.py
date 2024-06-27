@@ -65,6 +65,11 @@ acw_change = st.sidebar.slider("Change in ACW (sec)", min_value=-20, max_value=2
 asa_change = st.sidebar.slider("Change in ASA (sec)", min_value=-10, max_value=10, value=0, step=1)
 csat_change = st.sidebar.slider("Change in CSAT (%)", min_value=-10, max_value=10, value=0, step=1)
 
+# Sidebar for current performance input
+st.sidebar.header("Current Performance")
+current_fcr = st.sidebar.number_input("Current FCR (%)", min_value=0.0, max_value=100.0, value=benchmark_fcr)
+current_churn = st.sidebar.number_input("Current Churn Rate (%)", min_value=0.0, max_value=100.0, value=benchmark_churn)
+
 uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
 if uploaded_file is not None:
     try:
@@ -86,12 +91,14 @@ if uploaded_file is not None:
         with tab1:
             st.subheader("Performance Comparison")
             col1, col2 = st.columns(2)
-            fcr_delta = medians['First Call Resolution (FCR %)'] - benchmark_fcr
-            churn_delta = medians['Churn Rate (%)'] - benchmark_churn
+            fcr_delta = current_fcr - benchmark_fcr
+            churn_delta = current_churn - benchmark_churn
             with col1:
-                st.metric("Your FCR", f"{medians['First Call Resolution (FCR %)']:.2f}%", f"{fcr_delta:.2f}% from industry median", delta_color="inverse" if fcr_delta >= 0 else "normal")
+                st.metric("Your FCR", f"{current_fcr:.2f}%", f"{fcr_delta:.2f}% from industry median", delta_color="normal" if fcr_delta >= 0 else "inverse")
+                st.metric("Industry FCR", f"{benchmark_fcr:.2f}%")
             with col2:
-                st.metric("Your Churn Rate", f"{medians['Churn Rate (%)']:.2f}%", f"{churn_delta:.2f}% from industry median", delta_color="inverse" if churn_delta <= 0 else "normal")
+                st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{churn_delta:.2f}% from industry median", delta_color="inverse" if churn_delta >= 0 else "normal")
+                st.metric("Industry Churn Rate", f"{benchmark_churn:.2f}%")
 
             # Monte Carlo Simulation for FCR and Churn Prediction
             st.subheader("Monte Carlo Simulation")
@@ -134,14 +141,14 @@ if uploaded_file is not None:
                 top_fcr_corr = correlation_matrix['First Call Resolution (FCR %)'].sort_values(key=abs, ascending=False)[1:6]
                 sns.barplot(x=top_fcr_corr.index, y=top_fcr_corr.values, ax=ax1)
                 ax1.set_title("Top 5 Correlations with FCR", fontsize=10, fontweight='bold')
-                ax1.set_xticklabels(ax1.get_xticklabels(), rotation=45, ha='right')
+                ax1.set_xticklabels(ax1.get_xticks(), rotation=45, ha='right')
                 ax1.tick_params(labelsize=9)
                 
                 # Plot for Churn
                 top_churn_corr = correlation_matrix['Churn Rate (%)'].sort_values(key=abs, ascending=False)[1:6]
                 sns.barplot(x=top_churn_corr.index, y=top_churn_corr.values, ax=ax2)
                 ax2.set_title("Top 5 Correlations with Churn Rate", fontsize=10, fontweight='bold')
-                ax2.set_xticklabels(ax2.get_xticklabels(), rotation=45, ha='right')
+                ax2.set_xticklabels(ax2.get_xticks(), rotation=45, ha='right')
                 ax2.tick_params(labelsize=9)
                 
                 plt.tight_layout()
