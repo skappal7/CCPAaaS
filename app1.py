@@ -8,7 +8,7 @@ def process_data(data):
     columns_to_drop = ['Year']
     data = data.drop(columns=[col for col in columns_to_drop if col in data.columns])
     numeric_columns = data.select_dtypes(include=[np.number]).columns
-    data = data[numeric_columns]
+    data = data[numeric_columns].fillna(0)  # Ensure no missing values
     return data
 
 # Function to run Monte Carlo simulations
@@ -19,7 +19,7 @@ def monte_carlo_simulation(data, target, num_simulations=10000):
         for column in data.columns:
             if column != target:
                 change = np.random.normal(loc=0, scale=0.1 * data[column].std(), size=data.shape[0])
-                simulated_data[column] += change
+                simulated_data[column] = np.maximum(0, simulated_data[column] + change)  # Ensure no negative values
         if target == 'First Call Resolution (FCR %)':
             model = sm.OLS(simulated_data[target], sm.add_constant(simulated_data.drop(columns=[target]))).fit()
             predictions = model.predict(sm.add_constant(simulated_data.drop(columns=[target])))
@@ -104,10 +104,10 @@ if uploaded_file is not None:
             if st.button("Run Monte Carlo Simulation"):
                 with st.spinner("Running Monte Carlo simulations..."):
                     # Apply changes to data
-                    data['Average Handling Time (AHT)'] += aht_change
-                    data['After Call Work (ACW)'] += acw_change
-                    data['Average Speed of Answer (ASA)'] += asa_change
-                    data['Customer Satisfaction (CSAT)'] += csat_change
+                    data['Average Handling Time (AHT)'] = np.maximum(0, data['Average Handling Time (AHT)'] + aht_change)
+                    data['After Call Work (ACW)'] = np.maximum(0, data['After Call Work (ACW)'] + acw_change)
+                    data['Average Speed of Answer (ASA)'] = np.maximum(0, data['Average Speed of Answer (ASA)'] + asa_change)
+                    data['Customer Satisfaction (CSAT)'] = np.maximum(0, data['Customer Satisfaction (CSAT)'] + csat_change)
 
                     simulations = monte_carlo_simulation(data, target_variable, num_simulations)
                     visualize_monte_carlo(simulations, target_variable)
