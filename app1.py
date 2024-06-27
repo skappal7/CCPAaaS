@@ -7,7 +7,7 @@ import statsmodels.api as sm
 
 # Function to process data
 def process_data(data):
-    columns_to_drop = ['Year', 'Industry']
+    columns_to_drop = ['Year']
     data = data.drop(columns=[col for col in columns_to_drop if col in data.columns])
     numeric_columns = data.select_dtypes(include=[np.number]).columns
     data = data[numeric_columns]
@@ -45,7 +45,26 @@ def visualize_monte_carlo(simulations, target):
 st.set_page_config(page_title="Call Center FCR and Churn Predictor", page_icon=":phone:", layout="wide")
 st.title("Call Center FCR and Churn Predictor")
 
-# File upload
+# Example industry benchmark data
+industry_benchmarks = {
+    "Retail": {'FCR': 80, 'Churn': 10},
+    "Healthcare": {'FCR': 85, 'Churn': 5},
+    "Technology": {'FCR': 78, 'Churn': 12},
+    "Finance": {'FCR': 82, 'Churn': 8}
+}
+
+# Sidebar for industry selection and metric adjustments
+st.sidebar.header("Settings")
+
+industry = st.sidebar.selectbox("Select Industry", options=list(industry_benchmarks.keys()))
+benchmark_fcr = industry_benchmarks[industry]['FCR']
+benchmark_churn = industry_benchmarks[industry]['Churn']
+
+aht_change = st.sidebar.slider("Change in AHT (sec)", min_value=-100, max_value=100, value=0, step=5)
+acw_change = st.sidebar.slider("Change in ACW (sec)", min_value=-20, max_value=20, value=0, step=1)
+asa_change = st.sidebar.slider("Change in ASA (sec)", min_value=-10, max_value=10, value=0, step=1)
+csat_change = st.sidebar.slider("Change in CSAT (%)", min_value=-10, max_value=10, value=0, step=1)
+
 uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
 if uploaded_file is not None:
     try:
@@ -55,10 +74,11 @@ if uploaded_file is not None:
         # Calculate median for each metric
         medians = data.median()
 
-        # Sidebar for current performance input
-        st.sidebar.header("Current Performance")
-        current_fcr = st.sidebar.number_input("Current FCR (%)", min_value=0.0, max_value=100.0, value=float(medians['First Call Resolution (FCR %)']))
-        current_churn = st.sidebar.number_input("Current Churn Rate (%)", min_value=0.0, max_value=100.0, value=float(medians['Churn Rate (%)']))
+        # Display industry benchmarks
+        st.subheader("Industry Benchmarks")
+        st.write(f"Selected Industry: {industry}")
+        st.write(f"Industry Median FCR: {benchmark_fcr}%")
+        st.write(f"Industry Median Churn: {benchmark_churn}%")
 
         # Main content area
         tab1, tab2 = st.tabs(["FCR and Churn Predictor", "Industry Trends"])
@@ -67,17 +87,23 @@ if uploaded_file is not None:
             st.subheader("Performance Comparison")
             col1, col2 = st.columns(2)
             with col1:
-                st.metric("Your FCR", f"{current_fcr:.2f}%", f"{current_fcr - medians['First Call Resolution (FCR %)']:.2f}%")
+                st.metric("Your FCR", f"{medians['First Call Resolution (FCR %)']:.2f}%", f"{medians['First Call Resolution (FCR %)'] - benchmark_fcr:.2f}% from industry median")
             with col2:
-                st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{current_churn - medians['Churn Rate (%)']:.2f}%")
+                st.metric("Your Churn Rate", f"{medians['Churn Rate (%)']:.2f}%", f"{medians['Churn Rate (%)'] - benchmark_churn:.2f}% from industry median")
 
             # Monte Carlo Simulation for FCR and Churn Prediction
             st.subheader("Monte Carlo Simulation")
             target_variable = st.selectbox("Select Target Variable for Simulation", options=["First Call Resolution (FCR %)", "Churn Rate (%)"])
-            num_simulations = st.slider("Number of Simulations", min_value=1000, max_value=20000, value=10000, step=1000)
+            num_simulations = st.slider("Number of Simulations", min_value=10, max_value=20000, value=10000, step=10)
             
             if st.button("Run Monte Carlo Simulation"):
                 with st.spinner("Running Monte Carlo simulations..."):
+                    # Apply changes to data
+                    data['Average Handling Time (AHT)'] += aht_change
+                    data['After Call Work (ACW)'] += acw_change
+                    data['Average Speed of Answer (ASA)'] += asa_change
+                    data['Customer Satisfaction (CSAT)'] += csat_change
+
                     simulations = monte_carlo_simulation(data, target_variable, num_simulations)
                     visualize_monte_carlo(simulations, target_variable)
                     
