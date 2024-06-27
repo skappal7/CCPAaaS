@@ -72,7 +72,7 @@ def process_data(data):
     if 'Year' in data.columns:
         data = data.drop(columns=['Year'])
     if 'Industry' in data.columns:
-        data = data.drop(columns=['Industry'])
+        data = data.drop(columns(['Industry']))
     
     return data
 
@@ -103,6 +103,10 @@ if uploaded_file:
             for column in data.columns.drop(['First Call Resolution (FCR %)', 'Churn Rate (%)']):
                 inputs[column] = st.slider(f"Adjust {column}", min_value=float(data[column].min()), max_value=float(data[column].max()), value=float(means[column]), key=column)
 
+        # User input for desired improvement percentage
+        desired_fcr_improvement = st.number_input("Desired Improvement in FCR (%)", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
+        desired_churn_improvement = st.number_input("Desired Improvement in Churn (%)", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
+
         # Function to predict FCR and Churn based on weighted sum approach
         def predict_fcr_churn(inputs):
             fcr_pred = np.dot([inputs[metric] for metric in inputs.keys()], [correlation_matrix['First Call Resolution (FCR %)'][metric] for metric in inputs.keys()])
@@ -111,21 +115,22 @@ if uploaded_file:
             churn_pred = np.clip(churn_pred, 0, 100)
             return fcr_pred, churn_pred
 
-        # Function to calculate required metric improvements to improve FCR by 1%
-        def improvement_for_fcr():
+        # Function to calculate required metric improvements to improve FCR or Churn by a specified percentage
+        def improvement_for_target(target, desired_improvement):
             improvements = {
                 "Metric": [],
                 "Required Improvement": [],
-                "Change Direction": []
+                "Change Direction": [],
+                "Units": []
             }
             for metric in inputs.keys():
-                required_change = 1 / correlation_matrix['First Call Resolution (FCR %)'][metric]
+                required_change = desired_improvement / correlation_matrix[target][metric]
+                direction = "Increase" if correlation_matrix[target][metric] < 0 else "Decrease"
+                units = "sec" if "Time" in metric or "ASA" in metric or "ACW" in metric or "AWT" in metric else ("%" if "%" in metric else "min")
                 improvements["Metric"].append(metric)
-                if correlation_matrix['First Call Resolution (FCR %)'][metric] > 0:
-                    improvements["Change Direction"].append("Decrease")
-                else:
-                    improvements["Change Direction"].append("Increase")
                 improvements["Required Improvement"].append(f"{abs(required_change):.2f}")
+                improvements["Change Direction"].append(direction)
+                improvements["Units"].append(units)
             
             return pd.DataFrame(improvements)
 
@@ -152,10 +157,17 @@ if uploaded_file:
             impact_df = pd.DataFrame(impact_data)
             st.table(impact_df)
 
-            # Required improvements for 1% FCR improvement
-            st.subheader("Required Improvements for 1% FCR Improvement")
-            improvement_df = improvement_for_fcr()
-            st.table(improvement_df)
+            # Required improvements for FCR and Churn improvement
+            st.subheader(f"Required Improvements for {desired_fcr_improvement}% FCR Improvement")
+            fcr_improvement_df = improvement_for_target('First Call Resolution (FCR %)', desired_fcr_improvement)
+            st.table(fcr_improvement_df)
+
+            st.subheader(f"Required Improvements for {desired_churn_improvement}% Churn Improvement")
+            churn_improvement_df = improvement_for_target('Churn Rate (%)', desired_churn_improvement)
+            st.table(churn_improvement_df)
+
+            # Fine print explanation
+            st.caption("The required improvements are calculated based on the correlation coefficients between each metric and the target variable (FCR or Churn). A positive correlation indicates the metric needs to be decreased, while a negative correlation indicates the metric needs to be increased. The units of measurement are derived from the original metric definitions.")
 
             # Generate auto-comments based on predictions
             st.subheader("Insights and Recommendations")
@@ -181,29 +193,3 @@ if uploaded_file:
             st.subheader("Relationships between Metrics")
             selected_metric = st.selectbox("Select Metric to Compare with FCR and Churn", data.columns.drop(['First Call Resolution (FCR %)', 'Churn Rate (%)']))
             fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-            sns.scatterplot(data=data, x=selected_metric, y='First Call Resolution (FCR %)', ax=ax[0])
-            ax[0].set_title(f'{selected_metric} vs FCR')
-            sns.scatterplot(data=data, x=selected_metric, y='Churn Rate (%)', ax=ax[1])
-            ax[1].set_title(f'{selected_metric} vs Churn')
-            st.pyplot(fig)
-
-    with tab2:
-        st.subheader("Industry Trends")
-        st.write("Analyze the uploaded data to make sense of the industry trends.")
-        st.dataframe(data)
-
-    # Tech stack badges
-    st.markdown(
-        """
-        <div style='display: flex; justify-content: center;'>
-            <img src='https://img.shields.io/badge/Python-3.8-blue' style='margin: 5px;'>
-            <img src='https://img.shields.io/badge/Pandas-1.3.3-green' style='margin: 5px;'>
-            <img src='https://img.shields.io/badge/Streamlit-0.89.0-red' style='margin: 5px;'>
-            <img src='https://img.shields.io/badge/Matplotlib-3.4.3-orange' style='margin: 5px;'>
-            <img src='https://img.shields.io/badge/Seaborn-0.11.2-yellow' style='margin: 5px;'>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-else:
-    st.info("Please upload a CSV file to proceed.")
