@@ -126,11 +126,11 @@ with tab1:
         st.metric("Your FCR", f"{current_fcr:.2f}%", f"{fcr_delta:.2f}% from industry median")
         st.metric("Industry FCR", f"{benchmark_fcr:.2f}%")
     with col2:
-        st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{churn_delta:.2f}% from industry median")
+        st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{-churn_delta:.2f}% from industry median")
         st.metric("Industry Churn Rate", f"{benchmark_churn:.2f}%")
 
     # Information box about data source
-    st.info("The data has been curated from reports provided by platforms such as Talkdesk, LiveAgent, and Sprinklr, covering the years 2021 to 2024..")
+    st.info("The underlying data has been curated from reports from platforms like Talkdesk, LiveAgent, and Sprinklr from years 2021 to 2024.")
 
     # Monte Carlo Simulation for FCR and Churn Prediction
     st.subheader("Monte Carlo Simulation")
