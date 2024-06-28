@@ -216,7 +216,7 @@ with tab1:
                 ]
 
                 st.markdown(
-                    '<ul style="color: lightgrey; font-style: italic;">' +
+                    '<ul style="color: grey; font-style: italic;">' +
                     ''.join([f'<li>{insight}</li>' for insight in insights]) +
                     '</ul>',
                     unsafe_allow_html=True
