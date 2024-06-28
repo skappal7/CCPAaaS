@@ -129,53 +129,115 @@ with tab1:
         st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{churn_delta:.2f}% from industry median")
         st.metric("Industry Churn Rate", f"{benchmark_churn:.2f}%")
 
+    # Information box about data source
+    st.info("The underlying data has been curated from reports from platforms like Talkdesk, LiveAgent, and Sprinklr from years 2021 to 2024.")
+
     # Monte Carlo Simulation for FCR and Churn Prediction
     st.subheader("Monte Carlo Simulation")
-    target_variable = st.selectbox("Select Target Variable for Simulation", options=["First Call Resolution (FCR %)", "Churn Rate (%)"])
-    num_simulations = st.slider("Number of Simulations", min_value=10, max_value=20000, value=10000, step=10)
     
+    # 1. User Guidance
+    with st.expander("What is Monte Carlo Simulation?"):
+        st.write("""
+        Monte Carlo simulation is a statistical technique that uses random sampling to obtain numerical results. 
+        In this context, it helps predict possible outcomes for FCR and Churn Rate based on the input data and industry trends.
+        The simulation runs thousands of scenarios to provide a range of possible outcomes and their probabilities.
+        """)
+
+    target_variable = st.selectbox("Select Target Variable for Simulation", options=["First Call Resolution (FCR %)", "Churn Rate (%)"])
+    
+    # 2. Interactivity
+    num_simulations = st.slider("Number of Simulations", min_value=10, max_value=20000, value=10000, step=10)
+    confidence_level = st.slider("Confidence Level for Risk Metrics", min_value=0.8, max_value=0.99, value=0.95, step=0.01)
+
+    # 3. Scenario Analysis
+    st.subheader("Scenario Analysis")
+    scenario = st.radio("Choose a scenario:", ["Current", "Optimistic", "Pessimistic"])
+    if scenario == "Optimistic":
+        data = data * 1.1  # Improve all metrics by 10%
+    elif scenario == "Pessimistic":
+        data = data * 0.9  # Worsen all metrics by 10%
+
+    # 4. Data Input Flexibility
+    st.subheader("Custom Data Input")
+    use_custom_data = st.checkbox("Use custom data")
+    if use_custom_data:
+        uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
+        if uploaded_file is not None:
+            data = pd.read_csv(uploaded_file)
+            data = process_data(data)
+
     if st.button("Run Monte Carlo Simulation"):
-        with st.spinner("Running Monte Carlo simulations..."):
-            simulations = monte_carlo_simulation(data, target_variable, num_simulations)
-            visualize_monte_carlo(simulations, target_variable)
-            
-            # Provide summary and insights
-            st.subheader("Simulation Summary and Insights")
-            mean_sim = np.mean(simulations)
-            median_sim = np.median(simulations)
-            std_sim = np.std(simulations)
-            min_sim = np.min(simulations)
-            max_sim = np.max(simulations)
-            percentiles = np.percentile(simulations, [5, 25, 50, 75, 95])
-            ci_low, ci_high = np.percentile(simulations, [2.5, 97.5])
-            probability = np.mean(np.array(simulations) > current_fcr if target_variable == "First Call Resolution (FCR %)" else current_churn) * 100
-            VaR, CVaR = calculate_risk_metrics(simulations)
+        # 9. Error Handling
+        try:
+            with st.spinner("Running Monte Carlo simulations..."):
+                simulations = monte_carlo_simulation(data, target_variable, num_simulations)
+                visualize_monte_carlo(simulations, target_variable)
+                
+                # Provide summary and insights
+                st.subheader("Simulation Summary and Insights")
+                mean_sim = np.mean(simulations)
+                median_sim = np.median(simulations)
+                std_sim = np.std(simulations)
+                min_sim = np.min(simulations)
+                max_sim = np.max(simulations)
+                percentiles = np.percentile(simulations, [5, 25, 50, 75, 95])
+                ci_low, ci_high = np.percentile(simulations, [2.5, 97.5])
+                probability = np.mean(np.array(simulations) > current_fcr if target_variable == "First Call Resolution (FCR %)" else current_churn) * 100
+                VaR, CVaR = calculate_risk_metrics(simulations, confidence_level)
 
-            insights = [
-                f"The average simulated {target_variable} is {mean_sim:.2f}%.",
-                f"The median simulated {target_variable} is {median_sim:.2f}%.",
-                f"The standard deviation of the simulated {target_variable} is {std_sim:.2f}.",
-                f"The minimum simulated {target_variable} is {min_sim:.2f}%.",
-                f"The maximum simulated {target_variable} is {max_sim:.2f}%.",
-                f"The 95% confidence interval for {target_variable} is ({ci_low:.2f}%, {ci_high:.2f}%).",
-                f"The probability of achieving more than the current {target_variable} is {probability:.2f}%.",
-                f"The Value at Risk (VaR) at 95% confidence level is {VaR:.2f}%.",
-                f"The Conditional Value at Risk (CVaR) at 95% confidence level is {CVaR:.2f}%."
-            ]
+                insights = [
+                    f"The average simulated {target_variable} is {mean_sim:.2f}%.",
+                    f"The median simulated {target_variable} is {median_sim:.2f}%.",
+                    f"The standard deviation of the simulated {target_variable} is {std_sim:.2f}.",
+                    f"The minimum simulated {target_variable} is {min_sim:.2f}%.",
+                    f"The maximum simulated {target_variable} is {max_sim:.2f}%.",
+                    f"The 95% confidence interval for {target_variable} is ({ci_low:.2f}%, {ci_high:.2f}%).",
+                    f"The probability of achieving more than the current {target_variable} is {probability:.2f}%.",
+                    f"The Value at Risk (VaR) at {confidence_level*100:.0f}% confidence level is {VaR:.2f}%.",
+                    f"The Conditional Value at Risk (CVaR) at {confidence_level*100:.0f}% confidence level is {CVaR:.2f}%."
+                ]
 
-            st.markdown(
-                '<ul style="color: grey; font-style: italic;">' +
-                ''.join([f'<li>{insight}</li>' for insight in insights]) +
-                '</ul>',
-                unsafe_allow_html=True
-            )
+                st.markdown(
+                    '<ul style="color: lightgrey; font-style: italic;">' +
+                    ''.join([f'<li>{insight}</li>' for insight in insights]) +
+                    '</ul>',
+                    unsafe_allow_html=True
+                )
 
-            st.subheader(f"Percentiles of the Simulated {target_variable}")
-            percentiles_df = pd.DataFrame({
-                'Percentile': ['5th', '25th', '50th', '75th', '95th'],
-                'Value (%)': [f"{p:.2f}%" for p in percentiles]
-            })
-            st.table(percentiles_df)
+                st.subheader(f"Percentiles of the Simulated {target_variable}")
+                percentiles_df = pd.DataFrame({
+                    'Percentile': ['5th', '25th', '50th', '75th', '95th'],
+                    'Value (%)': [f"{p:.2f}%" for p in percentiles]
+                })
+                st.table(percentiles_df)
+
+                # 5. Recommendations Engine
+                st.subheader("Recommendations")
+                if target_variable == "First Call Resolution (FCR %)":
+                    if mean_sim < current_fcr:
+                        st.warning("Your FCR is predicted to decrease. Consider the following actions:")
+                        st.write("- Improve agent training programs")
+                        st.write("- Enhance knowledge base and self-service options")
+                        st.write("- Implement advanced call routing to match customers with the most suitable agents")
+                    else:
+                        st.success("Your FCR is predicted to improve. To maintain this trend:")
+                        st.write("- Continue monitoring and optimizing agent performance")
+                        st.write("- Regularly update your knowledge base")
+                        st.write("- Collect and act on customer feedback")
+                else:  # Churn Rate
+                    if mean_sim > current_churn:
+                        st.warning("Your Churn Rate is predicted to increase. Consider the following actions:")
+                        st.write("- Implement a proactive customer retention program")
+                        st.write("- Improve product/service quality based on customer feedback")
+                        st.write("- Enhance customer support and engagement strategies")
+                    else:
+                        st.success("Your Churn Rate is predicted to decrease. To maintain this trend:")
+                        st.write("- Continue focusing on customer satisfaction and loyalty programs")
+                        st.write("- Regularly assess and improve your retention strategies")
+                        st.write("- Monitor competitors and stay ahead in your offerings")
+
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}. Please check your input data and try again.")
 
     # Correlation tables
     st.subheader("Correlations with FCR and Churn")
