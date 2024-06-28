@@ -170,7 +170,7 @@ with tab1:
             st.subheader(f"Percentiles of the Simulated {target_variable}")
             percentiles_df = pd.DataFrame({
                 'Percentile': ['5th', '25th', '50th', '75th', '95th'],
-                'Value (%)': [f"{p:.2f}" for p in percentiles]
+                'Value (%)': [f"{p:.2f}%" for p in percentiles]
             })
             st.table(percentiles_df)
 
