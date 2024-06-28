@@ -32,22 +32,46 @@ def monte_carlo_simulation(data, target, num_simulations=10000):
         simulations.append(predictions.median())
     return simulations
 
+# Function to calculate risk metrics
+def calculate_risk_metrics(simulations, confidence_level=0.95):
+    VaR = np.percentile(simulations, (1 - confidence_level) * 100)
+    CVaR = np.mean([x for x in simulations if x <= VaR])
+    return VaR, CVaR
+
 # Function to visualize Monte Carlo results
 def visualize_monte_carlo(simulations, target):
-    fig, ax = plt.subplots(1, 3, figsize=(18, 6))
+    fig, ax = plt.subplots(2, 3, figsize=(18, 12))
 
-    sns.histplot(simulations, kde=True, bins=50, ax=ax[0])
-    ax[0].set_title(f'Histogram of {target}')
-    ax[0].set_xlabel(f'{target} (%)')
-    ax[0].set_ylabel('Frequency')
+    # Histogram
+    sns.histplot(simulations, kde=True, bins=50, ax=ax[0, 0])
+    ax[0, 0].set_title(f'Histogram of {target}')
+    ax[0, 0].set_xlabel(f'{target} (%)')
+    ax[0, 0].set_ylabel('Frequency')
 
-    sns.boxplot(x=simulations, ax=ax[1])
-    ax[1].set_title(f'Boxplot of {target}')
-    ax[1].set_xlabel(f'{target} (%)')
+    # Density Plot
+    sns.kdeplot(simulations, ax=ax[0, 1])
+    ax[0, 1].set_title(f'Density Plot of {target}')
+    ax[0, 1].set_xlabel(f'{target} (%)')
+    ax[0, 1].set_ylabel('Density')
 
-    sns.ecdfplot(simulations, ax=ax[2])
-    ax[2].set_title(f'Cumulative Distribution of {target}')
-    ax[2].set_xlabel(f'{target} (%)')
+    # Box Plot
+    sns.boxplot(x=simulations, ax=ax[0, 2])
+    ax[0, 2].set_title(f'Boxplot of {target}')
+    ax[0, 2].set_xlabel(f'{target} (%)')
+
+    # Cumulative Distribution Function (CDF)
+    sns.ecdfplot(simulations, ax=ax[1, 0])
+    ax[1, 0].set_title(f'Cumulative Distribution of {target}')
+    ax[1, 0].set_xlabel(f'{target} (%)')
+    ax[1, 0].set_ylabel('Cumulative Probability')
+
+    # Line Plot of Simulated Paths (Sampled Paths)
+    for i in range(10):
+        sampled_path = np.random.choice(simulations, size=len(simulations))
+        ax[1, 1].plot(sampled_path, alpha=0.3)
+    ax[1, 1].set_title(f'Simulated Paths of {target}')
+    ax[1, 1].set_xlabel('Simulation Index')
+    ax[1, 1].set_ylabel(f'{target} (%)')
 
     st.pyplot(fig)
 
@@ -117,14 +141,24 @@ with tab1:
             mean_sim = np.mean(simulations)
             median_sim = np.median(simulations)
             std_sim = np.std(simulations)
+            min_sim = np.min(simulations)
+            max_sim = np.max(simulations)
+            percentiles = np.percentile(simulations, [5, 25, 50, 75, 95])
             ci_low, ci_high = np.percentile(simulations, [2.5, 97.5])
             probability = np.mean(np.array(simulations) > current_fcr if target_variable == "First Call Resolution (FCR %)" else current_churn) * 100
+            VaR, CVaR = calculate_risk_metrics(simulations)
 
             st.write(f"The average simulated {target_variable} is **{mean_sim:.2f}%**.")
             st.write(f"The median simulated {target_variable} is **{median_sim:.2f}%**.")
             st.write(f"The standard deviation of the simulated {target_variable} is **{std_sim:.2f}**.")
+            st.write(f"The minimum simulated {target_variable} is **{min_sim:.2f}%**.")
+            st.write(f"The maximum simulated {target_variable} is **{max_sim:.2f}%**.")
+            st.write(f"The percentiles of the simulated {target_variable} are:")
+            st.write(f"5th: **{percentiles[0]:.2f}%**, 25th: **{percentiles[1]:.2f}%**, 50th: **{percentiles[2]:.2f}%**, 75th: **{percentiles[3]:.2f}%**, 95th: **{percentiles[4]:.2f}%**.")
             st.write(f"The 95% confidence interval for {target_variable} is **({ci_low:.2f}%, {ci_high:.2f}%)**.")
             st.write(f"The probability of achieving more than the current {target_variable} is **{probability:.2f}%**.")
+            st.write(f"The Value at Risk (VaR) at 95% confidence level is **{VaR:.2f}%**.")
+            st.write(f"The Conditional Value at Risk (CVaR) at 95% confidence level is **{CVaR:.2f}%**.")
 
     # Correlation tables
     st.subheader("Correlations with FCR and Churn")
