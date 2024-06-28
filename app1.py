@@ -102,6 +102,9 @@ current_churn = st.sidebar.number_input("Current Churn Rate (%)", min_value=0.0,
 # Fetch data directly from GitHub
 url = "https://raw.githubusercontent.com/skappal7/CCPAaaS/main/Call%20Center%20Data%202022%20-%202024.csv"
 data = pd.read_csv(url)
+
+# Filter data based on the selected industry
+data = data[data['Industry'] == industry]
 data = process_data(data)
 
 # Calculate median for each metric
