@@ -121,12 +121,20 @@ with tab1:
     st.subheader("Performance Comparison")
     col1, col2 = st.columns(2)
     fcr_delta = current_fcr - benchmark_fcr
-    churn_delta = current_churn - benchmark_churn  # Positive delta means higher (worse) churn
+    churn_delta = current_churn - benchmark_churn
     with col1:
         st.metric("Your FCR", f"{current_fcr:.2f}%", f"{fcr_delta:.2f}% from industry median")
         st.metric("Industry FCR", f"{benchmark_fcr:.2f}%")
     with col2:
-        st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{-churn_delta:.2f}% from industry median")
+        # Custom display for churn rate
+        st.write("Your Churn Rate")
+        st.write(f"<span style='font-size:24px; font-weight:bold;'>{current_churn:.2f}%</span>", unsafe_allow_html=True)
+        if churn_delta < 0:
+            st.write(f"<span style='color:green;'>▼ {abs(churn_delta):.2f}% below industry median</span>", unsafe_allow_html=True)
+        elif churn_delta > 0:
+            st.write(f"<span style='color:red;'>▲ {churn_delta:.2f}% above industry median</span>", unsafe_allow_html=True)
+        else:
+            st.write("At industry median")
         st.metric("Industry Churn Rate", f"{benchmark_churn:.2f}%")
 
     # Information box about data source
