@@ -149,25 +149,30 @@ with tab1:
             VaR, CVaR = calculate_risk_metrics(simulations)
 
             insights = [
-                f"The average simulated {target_variable} is **{mean_sim:.2f}%**.",
-                f"The median simulated {target_variable} is **{median_sim:.2f}%**.",
-                f"The standard deviation of the simulated {target_variable} is **{std_sim:.2f}**.",
-                f"The minimum simulated {target_variable} is **{min_sim:.2f}%**.",
-                f"The maximum simulated {target_variable} is **{max_sim:.2f}%**.",
-                f"The percentiles of the simulated {target_variable} are:",
-                f"5th: **{percentiles[0]:.2f}%**, 25th: **{percentiles[1]:.2f}%**, 50th: **{percentiles[2]:.2f}%**, 75th: **{percentiles[3]:.2f}%**, 95th: **{percentiles[4]:.2f}%**.",
-                f"The 95% confidence interval for {target_variable} is **({ci_low:.2f}%, {ci_high:.2f}%)**.",
-                f"The probability of achieving more than the current {target_variable} is **{probability:.2f}%**.",
-                f"The Value at Risk (VaR) at 95% confidence level is **{VaR:.2f}%**.",
-                f"The Conditional Value at Risk (CVaR) at 95% confidence level is **{CVaR:.2f}%**."
+                f"The average simulated {target_variable} is {mean_sim:.2f}%.",
+                f"The median simulated {target_variable} is {median_sim:.2f}%.",
+                f"The standard deviation of the simulated {target_variable} is {std_sim:.2f}.",
+                f"The minimum simulated {target_variable} is {min_sim:.2f}%.",
+                f"The maximum simulated {target_variable} is {max_sim:.2f}%.",
+                f"The 95% confidence interval for {target_variable} is ({ci_low:.2f}%, {ci_high:.2f}%).",
+                f"The probability of achieving more than the current {target_variable} is {probability:.2f}%.",
+                f"The Value at Risk (VaR) at 95% confidence level is {VaR:.2f}%.",
+                f"The Conditional Value at Risk (CVaR) at 95% confidence level is {CVaR:.2f}%."
             ]
 
             st.markdown(
-                '<ul style="color: grey; font-style: italic;">' +
+                '<ul style="color: lightgrey; font-style: italic;">' +
                 ''.join([f'<li>{insight}</li>' for insight in insights]) +
                 '</ul>',
                 unsafe_allow_html=True
             )
+
+            st.subheader(f"Percentiles of the Simulated {target_variable}")
+            percentiles_df = pd.DataFrame({
+                'Percentile': ['5th', '25th', '50th', '75th', '95th'],
+                'Value (%)': [f"{p:.2f}" for p in percentiles]
+            })
+            st.table(percentiles_df)
 
     # Correlation tables
     st.subheader("Correlations with FCR and Churn")
