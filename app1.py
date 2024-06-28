@@ -121,12 +121,12 @@ with tab1:
     st.subheader("Performance Comparison")
     col1, col2 = st.columns(2)
     fcr_delta = current_fcr - benchmark_fcr
-    churn_delta = benchmark_churn - current_churn  # Reversed to make lower churn positive
+    churn_delta = current_churn - benchmark_churn  # Positive delta means higher (worse) churn
     with col1:
         st.metric("Your FCR", f"{current_fcr:.2f}%", f"{fcr_delta:.2f}% from industry median")
         st.metric("Industry FCR", f"{benchmark_fcr:.2f}%")
     with col2:
-        st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{churn_delta:.2f}% from industry median")
+        st.metric("Your Churn Rate", f"{current_churn:.2f}%", f"{-churn_delta:.2f}% from industry median")
         st.metric("Industry Churn Rate", f"{benchmark_churn:.2f}%")
 
     # Information box about data source
