@@ -122,9 +122,19 @@ with tab1:
     col1, col2 = st.columns(2)
     fcr_delta = current_fcr - benchmark_fcr
     churn_delta = current_churn - benchmark_churn
+    
     with col1:
-        st.metric("Your FCR", f"{current_fcr:.2f}%", f"{fcr_delta:.2f}% from industry median")
+        # Custom display for FCR
+        st.write("Your First Call Resolution (FCR)")
+        st.write(f"<span style='font-size:24px; font-weight:bold;'>{current_fcr:.2f}%</span>", unsafe_allow_html=True)
+        if fcr_delta > 0:
+            st.write(f"<span style='color:green;'>▲ {fcr_delta:.2f}% above industry median</span>", unsafe_allow_html=True)
+        elif fcr_delta < 0:
+            st.write(f"<span style='color:red;'>▼ {abs(fcr_delta):.2f}% below industry median</span>", unsafe_allow_html=True)
+        else:
+            st.write("At industry median")
         st.metric("Industry FCR", f"{benchmark_fcr:.2f}%")
+
     with col2:
         # Custom display for churn rate
         st.write("Your Churn Rate")
