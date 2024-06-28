@@ -228,59 +228,59 @@ with tab1:
                     'Value (%)': [f"{p:.2f}%" for p in percentiles]
                 })
                 st.table(percentiles_df)
-                
-# After displaying the percentiles table
-st.subheader(f"Understanding the {target_variable} Percentiles")
 
-explanation = f"""
-This table shows the distribution of simulated {target_variable} outcomes:
+                # New explanation section
+                st.subheader(f"Understanding the {target_variable} Percentiles")
 
-1. **5th Percentile (Most Conservative)**: {percentiles[0]:.2f}%
-   - 5% of simulations resulted in a {target_variable} at or below this value.
-   - This can be considered a "reasonable worst-case scenario".
+                explanation = f"""
+                This table shows the distribution of simulated {target_variable} outcomes:
 
-2. **25th Percentile**: {percentiles[1]:.2f}%
-   - 25% of simulations fell at or below this value.
+                1. **5th Percentile (Most Conservative)**: {percentiles[0]:.2f}%
+                   - 5% of simulations resulted in a {target_variable} at or below this value.
+                   - This can be considered a "reasonable worst-case scenario".
 
-3. **50th Percentile (Median)**: {percentiles[2]:.2f}%
-   - This is the middle value of all simulations.
-   - Half of the simulations resulted in a higher {target_variable}, and half lower.
+                2. **25th Percentile**: {percentiles[1]:.2f}%
+                   - 25% of simulations fell at or below this value.
 
-4. **75th Percentile**: {percentiles[3]:.2f}%
-   - 75% of simulations fell at or below this value.
+                3. **50th Percentile (Median)**: {percentiles[2]:.2f}%
+                   - This is the middle value of all simulations.
+                   - Half of the simulations resulted in a higher {target_variable}, and half lower.
 
-5. **95th Percentile (Most Optimistic)**: {percentiles[4]:.2f}%
-   - 95% of simulations resulted in a {target_variable} at or below this value.
-   - This can be considered a "reasonable best-case scenario".
+                4. **75th Percentile**: {percentiles[3]:.2f}%
+                   - 75% of simulations fell at or below this value.
 
-**Key Insights:**
-- Range of Outcomes: The simulations suggest that the {target_variable} is likely to fall between {percentiles[0]:.2f}% and {percentiles[4]:.2f}%.
-- Variability: {'The narrow range suggests a stable prediction.' if percentiles[4] - percentiles[0] < 5 else 'The wide range suggests significant variability in potential outcomes.'}
-- Your Current Performance: Your current {target_variable} of {current_fcr if target_variable == 'First Call Resolution (FCR %)' else current_churn:.2f}% 
-  {'is better than' if (target_variable == 'First Call Resolution (FCR %)' and current_fcr > percentiles[2]) or (target_variable == 'Churn Rate (%)' and current_churn < percentiles[2]) else 'is worse than'} 
-  the median simulated outcome.
+                5. **95th Percentile (Most Optimistic)**: {percentiles[4]:.2f}%
+                   - 95% of simulations resulted in a {target_variable} at or below this value.
+                   - This can be considered a "reasonable best-case scenario".
 
-This information can help in setting realistic goals, understanding potential risks, and making informed decisions about strategies to {'improve' if target_variable == 'First Call Resolution (FCR %)' else 'reduce'} {target_variable}.
-"""
+                **Key Insights:**
+                - Range of Outcomes: The simulations suggest that the {target_variable} is likely to fall between {percentiles[0]:.2f}% and {percentiles[4]:.2f}%.
+                - Variability: {'The narrow range suggests a stable prediction.' if percentiles[4] - percentiles[0] < 5 else 'The wide range suggests significant variability in potential outcomes.'}
+                - Your Current Performance: Your current {target_variable} of {current_fcr if target_variable == 'First Call Resolution (FCR %)' else current_churn:.2f}% 
+                  {'is better than' if (target_variable == 'First Call Resolution (FCR %)' and current_fcr > percentiles[2]) or (target_variable == 'Churn Rate (%)' and current_churn < percentiles[2]) else 'is worse than'} 
+                  the median simulated outcome.
 
-st.markdown(explanation)
+                This information can help in setting realistic goals, understanding potential risks, and making informed decisions about strategies to {'improve' if target_variable == 'First Call Resolution (FCR %)' else 'reduce'} {target_variable}.
+                """
+
+                st.markdown(explanation)
 
 # Optional: Add an expandable section for more detailed explanation
-with st.expander("Click here for more details on interpreting percentiles"):
-    st.write("""
-    Percentiles help you understand the distribution of possible outcomes:
-    - Lower percentiles (5th, 25th) represent more conservative estimates.
-    - Higher percentiles (75th, 95th) represent more optimistic estimates.
-    - The median (50th percentile) represents the most likely outcome.
+                with st.expander("Click here for more details on interpreting percentiles"):
+                    st.write("""
+                    Percentiles help you understand the distribution of possible outcomes:
+                    - Lower percentiles (5th, 25th) represent more conservative estimates.
+                    - Higher percentiles (75th, 95th) represent more optimistic estimates.
+                    - The median (50th percentile) represents the most likely outcome.
 
-    By comparing these values:
-    - You can assess the range of likely outcomes.
-    - Understand the level of certainty in the predictions.
-    - Identify potential risks and opportunities.
+                    By comparing these values:
+                    - You can assess the range of likely outcomes.
+                    - Understand the level of certainty in the predictions.
+                    - Identify potential risks and opportunities.
 
-    Use this information to set realistic targets, prepare for different scenarios, and make data-driven decisions to optimize your call center performance.
-    """)
-                
+                    Use this information to set realistic targets, prepare for different scenarios, and make data-driven decisions to optimize your call center performance.
+                    """)
+
                 # 5. Recommendations Engine
                 st.subheader("Recommendations")
                 if target_variable == "First Call Resolution (FCR %)":
@@ -322,3 +322,5 @@ with st.expander("Click here for more details on interpreting percentiles"):
 with tab2:
     st.subheader("Industry Trends")
     st.write("This section could include more detailed analysis of industry trends based on the uploaded data.")
+
+# You can add more content or features to the Industry Trends tab here if needed
